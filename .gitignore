@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+client-app/node_modules/
+
+# Secrets & Environment Variables (NEVER COMMIT)
+.env
+.env.local
+.env.*.local
+*.pem
+
+# Firebase Service Account Private Keys (CRITICAL)
+*-firebase-adminsdk-*.json
+firebase-service-account.json
+service-account*.json
+/google-services.json
+
+# Expo / React Native build & cache
+client-app/.expo/
+client-app/dist/
+client-app/web-build/
+client-app/.claude/
+client-app/CLAUDE.md
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Build outputs
+dist/
+build/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# System
+.DS_Store
+Thumbs.db

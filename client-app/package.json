@@ -1,0 +1,25 @@
+{
+  "name": "client-app",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "axios": "^1.20.0",
+    "expo": "~57.0.22",
+    "expo-battery": "~57.0.3",
+    "expo-device": "~57.0.2",
+    "expo-location": "~57.0.17",
+    "expo-network": "~57.0.2",
+    "expo-notifications": "~57.0.18",
+    "expo-status-bar": "~57.0.1",
+    "expo-task-manager": "~57.0.17",
+    "react": "19.2.3",
+    "react-native": "0.86.3"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "private": true
+}

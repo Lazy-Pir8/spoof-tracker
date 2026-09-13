@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spoof Tracker</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f4f4f9; }
+        h1 { color: #333; }
+        button { padding: 15px 30px; font-size: 18px; color: white; background-color: #007bff; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        #status { margin-top: 20px; font-size: 16px; color: #555; }
+    </style>
+</head>
+<body>
+
+    <h1>Tracker Setup</h1>
+    <button id="startBtn">Enable Tracking</button>
+    <p id="status">Click the button to allow location and notifications.</p>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
+        import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-messaging.js";
+
+        // Your Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyCejY8ji65DIObmccYNb2lpenwIplfIJGg",
+            projectId: "spoof-10233",
+            storageBucket: "spoof-10233.firebasestorage.app",
+            messagingSenderId: "520588327152",
+            appId: "1:520588327152:web:placeholder" // using a placeholder, might need a real web app id
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const messaging = getMessaging(app);
+
+        // From web-push-certificate.md
+        const vapidKey = "BA9YdT5IwMvsW2xT_R3Gh1ksYbaelqyZXvUywIYx5M2JwJzTYKN3mf4HkIfW6cQxM70fZ-WeggLk4MTB-wM6yqE";
+        
+        const startBtn = document.getElementById('startBtn');
+        const status = document.getElementById('status');
+
+        startBtn.addEventListener('click', async () => {
+            status.innerText = "Requesting permissions...";
+            try {
+                // 1. Request Notification Permission
+                const permission = await Notification.requestPermission();
+                if (permission !== 'granted') {
+                    throw new Error("Notification permission denied");
+                }
+
+                // 2. Request Location Permission (just to prompt the user initially)
+                await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject);
+                });
+
+                // 3. Register Service Worker
+                const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                
+                // 4. Get FCM Token
+                const currentToken = await getToken(messaging, { vapidKey, serviceWorkerRegistration: registration });
+                
+                if (currentToken) {
+                    status.innerText = "Registering with server...";
+                    
+                    const deviceId = 'web-' + Math.random().toString(36).substr(2, 9);
+                    localStorage.setItem('deviceId', deviceId);
+
+                    // 5. Send to Server
+                    const response = await fetch('/api/device/register', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            deviceId: deviceId,
+                            fcmToken: currentToken,
+                            deviceName: navigator.userAgent
+                        })
+                    });
+
+                    if (response.ok) {
+                        status.innerText = "✅ Device tracking enabled! You can now close this tab.";
+                        startBtn.style.display = 'none';
+                    } else {
+                        throw new Error("Failed to register with server");
+                    }
+                } else {
+                    throw new Error("No registration token available");
+                }
+            } catch (error) {
+                console.error(error);
+                status.innerText = "❌ Error: " + error.message;
+            }
+        });
+
+        // Handle foreground messages just in case
+        onMessage(messaging, (payload) => {
+            console.log('Message received in foreground. ', payload);
+            if (payload.data && payload.data.command === 'FETCH_LOCATION') {
+                sendLocationToServer();
+            }
+        });
+
+        // Handle messages from service worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('message', (event) => {
+                if (event.data && event.data.type === 'FETCH_LOCATION') {
+                    sendLocationToServer();
+                }
+            });
+        }
+
+        function sendLocationToServer() {
+            const deviceId = localStorage.getItem('deviceId');
+            if (!deviceId) return;
+
+            navigator.geolocation.getCurrentPosition((position) => {
+                fetch('/api/device/location', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        deviceId: deviceId,
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude
+                    })
+                }).then(res => console.log('Location sent', res.ok));
+            });
+        }
+    </script>
+</body>
+</html>

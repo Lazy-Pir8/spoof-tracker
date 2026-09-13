@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "520588327152",
+    "project_id": "spoof-10233",
+    "storage_bucket": "spoof-10233.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:520588327152:android:daeee5971498f5b9cdaa35",
+        "android_client_info": {
+          "package_name": "bits.personal.spoof"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCejY8ji65DIObmccYNb2lpenwIplfIJGg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
