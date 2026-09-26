@@ -320,8 +320,8 @@ export async function pingAllDevices(): Promise<PingResult> {
   };
 }
 
-// Endpoint for triggering a location fetch for ALL registered devices at once
-router.post('/ping-all', async (req: Request, res: Response): Promise<void> => {
+// Handler for triggering a location fetch for ALL registered devices at once
+const pingAllHandler = async (req: Request, res: Response): Promise<void> => {
   try {
     const result = await pingAllDevices();
     res.status(200).json({
@@ -332,7 +332,11 @@ router.post('/ping-all', async (req: Request, res: Response): Promise<void> => {
     console.error('Error pinging all devices:', error);
     res.status(500).json({ error: 'Failed to ping all devices' });
   }
-});
+};
+
+// Supports both POST and GET (useful for browser address bar and basic cron services)
+router.post('/ping-all', pingAllHandler);
+router.get('/ping-all', pingAllHandler);
 
 export default router;
 
