@@ -80,7 +80,7 @@
         }
         .btn-refresh {
             flex: 1;
-            padding: 8px 12px;
+            padding: 8px 10px;
             background: #2563eb;
             color: #fff;
             border: none;
@@ -91,9 +91,26 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
+            gap: 5px;
         }
         .btn-refresh:hover { background: #1d4ed8; }
+        .btn-ping-all {
+            flex: 1;
+            padding: 8px 10px;
+            background: #059669;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            transition: background 0.15s;
+        }
+        .btn-ping-all:hover { background: #047857; }
         .auto-refresh {
             font-size: 11px;
             color: #94a3b8;
@@ -674,7 +691,8 @@
                 />
             </div>
             <div class="header-actions">
-                <button class="btn-refresh" onclick="fetchDevices()">🔄 Refresh List</button>
+                <button class="btn-refresh" onclick="fetchDevices()">🔄 Refresh</button>
+                <button class="btn-ping-all" onclick="pingAllDevicesFromUI(this)">⚡ Ping All</button>
             </div>
             <label class="auto-refresh">
                 <input type="checkbox" id="autoRefreshCheckbox" checked> Live auto-sync every 5s
@@ -1040,6 +1058,40 @@
             } catch (error) {
                 alert('Network error while pinging device');
                 btn.innerText = '📍 Ping Location';
+                btn.disabled = false;
+            }
+        }
+
+        // Trigger remote ping for all devices
+        async function pingAllDevicesFromUI(btn) {
+            const originalText = btn.innerHTML;
+            btn.innerText = '⏳ Pinging...';
+            btn.disabled = true;
+
+            try {
+                showToast('⚡ Broadcasting wakeup ping to all devices...');
+                const response = await fetch('/api/admin/ping-all', { method: 'POST' });
+                const result = await response.json();
+
+                if (response.ok) {
+                    btn.innerText = '✅ Dispatched!';
+                    showToast(`✅ Ping dispatched to ${result.success} of ${result.total} devices`);
+                    setTimeout(() => {
+                        btn.innerHTML = originalText;
+                        btn.disabled = false;
+                        fetchDevices();
+                        if (activeHistoryDeviceId) {
+                            loadDeviceHistory(activeHistoryDeviceId);
+                        }
+                    }, 3000);
+                } else {
+                    alert('Error: ' + (result.error || 'Failed to ping all devices'));
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                alert('Network error while pinging devices: ' + err.message);
+                btn.innerHTML = originalText;
                 btn.disabled = false;
             }
         }

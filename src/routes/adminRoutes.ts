@@ -240,5 +240,99 @@ router.post('/ping/:deviceId', async (req: Request, res: Response): Promise<void
   }
 });
 
+export interface PingResult {
+  total: number;
+  success: number;
+  failed: number;
+  skipped: number;
+  devices: Array<{
+    deviceId: string;
+    deviceName?: string;
+    status: 'sent' | 'failed' | 'no_token';
+    messageId?: string;
+    error?: string;
+  }>;
+}
+
+// Reusable function to ping all registered devices with valid FCM tokens
+export async function pingAllDevices(): Promise<PingResult> {
+  const snapshot = await db.collection('devices').get();
+  const devicesResult: PingResult['devices'] = [];
+
+  const promises = snapshot.docs.map(async (doc) => {
+    const deviceId = doc.id;
+    const deviceData = doc.data();
+    const fcmToken = deviceData?.fcmToken;
+    const deviceName = deviceData?.deviceName || 'Unknown Device';
+
+    if (!fcmToken) {
+      devicesResult.push({
+        deviceId,
+        deviceName,
+        status: 'no_token',
+        error: 'No FCM push token registered'
+      });
+      return;
+    }
+
+    const message = {
+      data: {
+        command: 'FETCH_LOCATION',
+        timestamp: new Date().toISOString()
+      },
+      android: {
+        priority: 'high' as const,
+      },
+      token: fcmToken
+    };
+
+    try {
+      const response = await messaging.send(message);
+      devicesResult.push({
+        deviceId,
+        deviceName,
+        status: 'sent',
+        messageId: response
+      });
+    } catch (err: any) {
+      console.error(`[Ping] Failed to ping device ${deviceId}:`, err.message);
+      devicesResult.push({
+        deviceId,
+        deviceName,
+        status: 'failed',
+        error: err.message
+      });
+    }
+  });
+
+  await Promise.allSettled(promises);
+
+  const success = devicesResult.filter((d) => d.status === 'sent').length;
+  const failed = devicesResult.filter((d) => d.status === 'failed').length;
+  const skipped = devicesResult.filter((d) => d.status === 'no_token').length;
+
+  return {
+    total: snapshot.size,
+    success,
+    failed,
+    skipped,
+    devices: devicesResult
+  };
+}
+
+// Endpoint for triggering a location fetch for ALL registered devices at once
+router.post('/ping-all', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await pingAllDevices();
+    res.status(200).json({
+      message: `Ping dispatched to ${result.success} of ${result.total} devices`,
+      ...result
+    });
+  } catch (error) {
+    console.error('Error pinging all devices:', error);
+    res.status(500).json({ error: 'Failed to ping all devices' });
+  }
+});
+
 export default router;
 
