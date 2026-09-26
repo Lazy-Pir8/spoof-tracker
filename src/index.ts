@@ -1,11 +1,11 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import deviceRoutes from './routes/deviceRoutes';
-import adminRoutes from './routes/adminRoutes';
+import deviceRoutes from './routes/deviceRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 // Middleware
 app.use(cors());

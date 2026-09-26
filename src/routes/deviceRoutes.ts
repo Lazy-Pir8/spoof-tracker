@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
-import { db } from '../firebase';
+import { FieldValue } from 'firebase-admin/firestore';
+import { db } from '../firebase.js';
 
 const router = Router();
 
@@ -40,6 +41,13 @@ router.post('/location', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+    if (isNaN(lat) || isNaN(lng)) {
+      res.status(400).json({ error: 'latitude and longitude must be valid numbers' });
+      return;
+    }
+
     const ipAddress = req.ip || req.socket.remoteAddress;
 
     // If deviceId is missing but fcmToken is provided (from background task)
@@ -53,18 +61,47 @@ router.post('/location', async (req: Request, res: Response): Promise<void> => {
       }
     }
 
+    const now = new Date();
+    const timestamp = now.toISOString();
+    const createdAt = now.getTime();
+
+    const locationData = {
+      latitude: lat,
+      longitude: lng,
+      ...(locationDetails || {})
+    };
+
+    // 1. Maintain latest location on device document for fast dashboard queries
     await db.collection('devices').doc(deviceId).set({
-      location: {
-        latitude,
-        longitude,
-        ...(locationDetails || {})
-      },
+      location: locationData,
       telemetry: telemetry || {},
       ipAddress,
-      lastUpdated: new Date().toISOString()
+      lastUpdated: timestamp,
+      totalPings: FieldValue.increment(1)
     }, { merge: true });
 
-    res.status(200).json({ message: 'Location updated successfully' });
+    // 2. Persist this ping to the history subcollection (never overwrite past pings)
+    const historyEntry = {
+      latitude: lat,
+      longitude: lng,
+      locationDetails: locationDetails || {},
+      telemetry: telemetry || {},
+      ipAddress: ipAddress || null,
+      timestamp,
+      createdAt
+    };
+
+    const historyRef = await db
+      .collection('devices')
+      .doc(deviceId)
+      .collection('history')
+      .add(historyEntry);
+
+    res.status(200).json({
+      message: 'Location updated and saved to history successfully',
+      historyId: historyRef.id,
+      timestamp
+    });
   } catch (error) {
     console.error('Error updating location:', error);
     res.status(500).json({ error: 'Failed to update location' });

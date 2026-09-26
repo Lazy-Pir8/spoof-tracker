@@ -18,27 +18,61 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background: #090d16;
             color: #f8fafc;
+            overflow: hidden;
         }
         #sidebar {
             width: 420px;
+            min-width: 420px;
             background-color: #111827;
             border-right: 1px solid #1f2937;
             display: flex;
             flex-direction: column;
             height: 100vh;
+            z-index: 1000;
         }
         .sidebar-header {
-            padding: 18px 20px;
+            padding: 16px 18px;
             border-bottom: 1px solid #1f2937;
             background: #0f172a;
         }
         .sidebar-header h2 {
             margin: 0 0 10px 0;
-            font-size: 19px;
+            font-size: 18px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            justify-content: space-between;
             color: #38bdf8;
+        }
+        .header-stats {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+            font-size: 11px;
+        }
+        .stat-badge {
+            background: #1e293b;
+            color: #94a3b8;
+            padding: 3px 8px;
+            border-radius: 4px;
+            border: 1px solid #334155;
+            font-weight: 500;
+        }
+        .stat-badge strong { color: #38bdf8; }
+        .search-box {
+            margin-bottom: 10px;
+        }
+        .search-input {
+            width: 100%;
+            padding: 8px 12px;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            color: #f8fafc;
+            font-size: 12px;
+            outline: none;
+        }
+        .search-input:focus {
+            border-color: #38bdf8;
         }
         .header-actions {
             display: flex;
@@ -46,69 +80,91 @@
         }
         .btn-refresh {
             flex: 1;
-            padding: 9px;
+            padding: 8px 12px;
             background: #2563eb;
             color: #fff;
             border: none;
             border-radius: 6px;
             font-weight: 600;
             cursor: pointer;
-            font-size: 13px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
         }
         .btn-refresh:hover { background: #1d4ed8; }
         .auto-refresh {
-            font-size: 12px;
+            font-size: 11px;
             color: #94a3b8;
             display: flex;
             align-items: center;
             gap: 6px;
             margin-top: 8px;
+            cursor: pointer;
         }
         #device-list {
             flex: 1;
             overflow-y: auto;
-            padding: 16px;
+            padding: 14px;
         }
         .device-card {
             border: 1px solid #1f2937;
             border-radius: 10px;
             padding: 14px;
-            margin-bottom: 14px;
+            margin-bottom: 12px;
             background: #182234;
-            transition: border-color 0.2s;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        .device-card:hover {
+            border-color: #374151;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
         .device-card.has-loc { border-left: 4px solid #10b981; }
         .device-card.no-loc { border-left: 4px solid #f59e0b; }
+        .device-card.active-history { border-left-color: #38bdf8; box-shadow: 0 0 0 1px #38bdf8; }
+        
         .device-title {
             display: flex;
             justify-content: space-between;
-            align-items: baseline;
-            margin-bottom: 8px;
+            align-items: flex-start;
+            margin-bottom: 6px;
+            gap: 8px;
         }
         .device-title h3 {
             margin: 0;
-            font-size: 15px;
+            font-size: 14px;
             color: #f8fafc;
             font-family: monospace;
+            word-break: break-all;
+        }
+        .badge-group {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
         }
         .device-badge {
-            font-size: 11px;
-            padding: 2px 7px;
+            font-size: 10px;
+            padding: 2px 6px;
             border-radius: 4px;
             font-weight: 600;
+            white-space: nowrap;
         }
         .badge-live { background: rgba(16, 185, 129, 0.2); color: #34d399; }
         .badge-waiting { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+        .badge-pings { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
         
         .prop-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 6px 12px;
+            gap: 5px 10px;
             margin: 8px 0;
             font-size: 12px;
             color: #94a3b8;
         }
-        .prop-item strong { color: #e2e8f0; }
+        .prop-item strong { color: #e2e8f0; font-weight: 500; }
         .prop-full { grid-column: 1 / -1; }
         
         .address-box {
@@ -116,21 +172,434 @@
             border: 1px solid #1e293b;
             padding: 8px 10px;
             border-radius: 6px;
-            font-size: 12px;
+            font-size: 11px;
             color: #38bdf8;
             margin: 8px 0;
             line-height: 1.4;
+            word-break: break-word;
         }
         
+        .gmaps-link {
+            display: inline-block;
+            margin-top: 4px;
+            margin-bottom: 8px;
+            font-size: 11px;
+            color: #38bdf8;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .gmaps-link:hover { text-decoration: underline; }
+
         .device-actions {
             display: flex;
-            gap: 8px;
+            flex-direction: column;
+            gap: 6px;
             margin-top: 10px;
+        }
+        .action-row {
+            display: flex;
+            gap: 6px;
         }
         .ping-btn {
             flex: 1;
-            padding: 8px;
+            padding: 7px 10px;
             background-color: #10b981;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            transition: background 0.15s;
+        }
+        .ping-btn:hover { background-color: #059669; }
+        .zoom-btn {
+            padding: 7px 10px;
+            background-color: #374151;
+            color: #f8fafc;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: background 0.15s;
+        }
+        .zoom-btn:hover { background-color: #4b5563; }
+        .history-btn {
+            flex: 1;
+            padding: 7px 10px;
+            background-color: #0284c7;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            transition: background 0.15s;
+        }
+        .history-btn:hover { background-color: #0369a1; }
+        .delete-btn {
+            padding: 7px 10px;
+            background-color: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            transition: all 0.15s;
+        }
+        .delete-btn:hover {
+            background-color: #ef4444;
+            color: white;
+            border-color: #ef4444;
+        }
+
+        #map-container {
+            flex-grow: 1;
+            position: relative;
+            height: 100vh;
+        }
+        #map { width: 100%; height: 100%; }
+
+        /* Floating map banner when history trail is shown */
+        .map-trail-banner {
+            position: absolute;
+            top: 14px;
+            left: 60px;
+            background: rgba(17, 24, 39, 0.92);
+            border: 1px solid #38bdf8;
+            backdrop-filter: blur(8px);
+            padding: 8px 14px;
+            border-radius: 8px;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 12px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+            animation: fadeIn 0.2s ease;
+        }
+        .map-trail-banner strong { color: #38bdf8; }
+        .btn-banner-action {
+            background: #1e293b;
+            color: #f8fafc;
+            border: 1px solid #475569;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .btn-banner-action:hover { background: #334155; }
+        .btn-banner-close {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .btn-banner-close:hover { background: #ef4444; color: white; }
+
+        /* History Slide-over Drawer */
+        #history-drawer {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 440px;
+            height: 100vh;
+            background: #111827;
+            border-left: 1px solid #1f2937;
+            box-shadow: -8px 0 25px rgba(0, 0, 0, 0.6);
+            z-index: 1500;
+            display: flex;
+            flex-direction: column;
+            transform: translateX(100%);
+            transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        #history-drawer.open {
+            transform: translateX(0);
+        }
+        .drawer-header {
+            padding: 18px 20px;
+            background: #0f172a;
+            border-bottom: 1px solid #1f2937;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .drawer-title h3 {
+            margin: 0 0 4px 0;
+            font-size: 16px;
+            color: #38bdf8;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .drawer-subtitle {
+            margin: 0;
+            font-size: 12px;
+            color: #94a3b8;
+            font-family: monospace;
+            word-break: break-all;
+        }
+        .btn-close-drawer {
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            line-height: 1;
+        }
+        .btn-close-drawer:hover { color: #f8fafc; background: #1e293b; }
+
+        .drawer-controls {
+            padding: 12px 20px;
+            background: #141e33;
+            border-bottom: 1px solid #1f2937;
+            display: flex;
+            gap: 8px;
+        }
+        .btn-drawer-ctrl {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+        .btn-trail-fit { background: #0284c7; color: white; }
+        .btn-trail-fit:hover { background: #0369a1; }
+        .btn-trail-clear { background: #374151; color: #f8fafc; }
+        .btn-trail-clear:hover { background: #4b5563; }
+
+        .drawer-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 20px;
+        }
+        .history-summary {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-bottom: 14px;
+            padding: 8px 12px;
+            background: #0f172a;
+            border-radius: 6px;
+            border: 1px solid #1e293b;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .history-summary strong { color: #38bdf8; }
+
+        /* Timeline Items */
+        .timeline {
+            position: relative;
+            padding-left: 20px;
+        }
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 6px;
+            top: 10px;
+            bottom: 10px;
+            width: 2px;
+            background: #1e293b;
+        }
+        .timeline-item {
+            position: relative;
+            margin-bottom: 16px;
+        }
+        .timeline-dot {
+            position: absolute;
+            left: -20px;
+            top: 12px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #0284c7;
+            border: 2px solid #0f172a;
+            box-shadow: 0 0 0 2px #38bdf8;
+        }
+        .timeline-item.is-latest .timeline-dot {
+            background: #10b981;
+            box-shadow: 0 0 0 2px #34d399, 0 0 8px #10b981;
+        }
+        .timeline-item.is-oldest .timeline-dot {
+            background: #f59e0b;
+            box-shadow: 0 0 0 2px #fbbf24;
+        }
+        .history-card {
+            background: #182234;
+            border: 1px solid #1f2937;
+            border-radius: 8px;
+            padding: 12px;
+            transition: all 0.15s;
+        }
+        .history-card:hover {
+            border-color: #38bdf8;
+            background: #1c283d;
+        }
+        .history-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 6px;
+        }
+        .history-tag {
+            font-size: 11px;
+            font-weight: 700;
+            color: #38bdf8;
+        }
+        .history-item.is-latest .history-tag { color: #34d399; }
+        .history-time {
+            font-size: 11px;
+            color: #94a3b8;
+        }
+        .history-coords {
+            font-family: monospace;
+            font-size: 12px;
+            color: #e2e8f0;
+            margin-bottom: 6px;
+        }
+        .history-pill-row {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-top: 6px;
+        }
+        .history-pill {
+            font-size: 10px;
+            background: #0f172a;
+            color: #cbd5e1;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid #1e293b;
+        }
+        .history-address {
+            margin-top: 6px;
+            font-size: 11px;
+            color: #38bdf8;
+            line-height: 1.35;
+        }
+        .history-actions {
+            display: flex;
+            gap: 6px;
+            margin-top: 10px;
+        }
+        .btn-focus-ping {
+            flex: 1;
+            padding: 5px 8px;
+            background: #1e293b;
+            border: 1px solid #334155;
+            color: #f8fafc;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-focus-ping:hover { background: #38bdf8; color: #090d16; border-color: #38bdf8; }
+        .btn-maps-ping {
+            padding: 5px 8px;
+            background: #1e293b;
+            border: 1px solid #334155;
+            color: #38bdf8;
+            border-radius: 4px;
+            font-size: 11px;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .btn-maps-ping:hover { background: #334155; }
+
+        /* Delete Confirm Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(4px);
+            z-index: 3000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.15s ease;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal-card {
+            background: #111827;
+            border: 1px solid #374151;
+            border-radius: 12px;
+            width: 420px;
+            max-width: 90vw;
+            padding: 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.8);
+        }
+        .modal-card h3 {
+            margin: 0 0 10px 0;
+            color: #ef4444;
+            font-size: 17px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .modal-card p {
+            color: #cbd5e1;
+            font-size: 13px;
+            line-height: 1.5;
+            margin: 0 0 16px 0;
+        }
+        .modal-warning-box {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 6px;
+            padding: 10px 12px;
+            color: #fca5a5;
+            font-size: 12px;
+            margin-bottom: 20px;
+        }
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        .btn-modal-cancel {
+            padding: 9px 16px;
+            background: #374151;
+            color: #f8fafc;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .btn-modal-cancel:hover { background: #4b5563; }
+        .btn-modal-confirm {
+            padding: 9px 16px;
+            background: #ef4444;
             color: white;
             border: none;
             border-radius: 6px;
@@ -138,28 +607,32 @@
             font-weight: 600;
             font-size: 13px;
         }
-        .ping-btn:hover { background-color: #059669; }
-        .zoom-btn {
-            padding: 8px 12px;
-            background-color: #374151;
+        .btn-modal-confirm:hover { background: #dc2626; }
+
+        /* Toast notifications */
+        #toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 4000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none;
+        }
+        .toast {
+            background: #1e293b;
             color: #f8fafc;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
+            border: 1px solid #38bdf8;
+            padding: 10px 16px;
+            border-radius: 8px;
             font-size: 13px;
-            font-weight: 600;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            animation: slideUp 0.2s ease;
+            pointer-events: auto;
         }
-        .zoom-btn:hover { background-color: #4b5563; }
-        .gmaps-link {
-            display: inline-block;
-            margin-top: 6px;
-            font-size: 12px;
-            color: #38bdf8;
-            text-decoration: none;
-            font-weight: 500;
-        }
-        .gmaps-link:hover { text-decoration: underline; }
-        #map { flex-grow: 1; height: 100vh; }
+
+        /* Leaflet popup customization */
         .leaflet-popup-content-wrapper {
             background: #111827;
             color: #f8fafc;
@@ -168,13 +641,38 @@
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7);
         }
         .leaflet-popup-tip { background: #111827; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body>
 
+    <!-- SIDEBAR -->
     <div id="sidebar">
         <div class="sidebar-header">
-            <h2>🛰️ Spoof Command Center</h2>
+            <h2>
+                <span>🛰️ Command Center</span>
+            </h2>
+            <div class="header-stats">
+                <span class="stat-badge"><strong id="stat-total">0</strong> Total</span>
+                <span class="stat-badge"><strong id="stat-located">0</strong> Located</span>
+            </div>
+            <div class="search-box">
+                <input
+                    type="text"
+                    id="deviceSearch"
+                    class="search-input"
+                    placeholder="🔍 Filter devices by ID or model..."
+                    oninput="handleSearch(this.value)"
+                />
+            </div>
             <div class="header-actions">
                 <button class="btn-refresh" onclick="fetchDevices()">🔄 Refresh List</button>
             </div>
@@ -185,7 +683,54 @@
         <div id="device-list">Connecting to telemetry network...</div>
     </div>
 
-    <div id="map"></div>
+    <!-- MAP CONTAINER -->
+    <div id="map-container">
+        <!-- Floating history banner -->
+        <div id="map-trail-banner" class="map-trail-banner" style="display:none;">
+            <span>📍 Trail for <strong id="trail-device-name">...</strong> (<span id="trail-point-count">0</span> pings)</span>
+            <button class="btn-banner-action" onclick="fitHistoryBounds()">🔍 Fit Bounds</button>
+            <button class="btn-banner-close" onclick="clearHistoryFromMap()">✖ Clear Trail</button>
+        </div>
+
+        <div id="map"></div>
+
+        <!-- HISTORY SLIDE-OVER DRAWER -->
+        <div id="history-drawer">
+            <div class="drawer-header">
+                <div class="drawer-title">
+                    <h3>📜 Location History</h3>
+                    <p id="history-drawer-device-id" class="drawer-subtitle">android-xxxx</p>
+                </div>
+                <button class="btn-close-drawer" onclick="closeHistoryDrawer()" title="Close Drawer">✖</button>
+            </div>
+            <div class="drawer-controls">
+                <button class="btn-drawer-ctrl btn-trail-fit" onclick="fitHistoryBounds()">🔍 Fit Trail Bounds</button>
+                <button class="btn-drawer-ctrl btn-trail-clear" onclick="clearHistoryFromMap()">🧹 Clear Map Trail</button>
+            </div>
+            <div class="drawer-body">
+                <div id="history-summary" class="history-summary">Loading past pings...</div>
+                <div id="history-timeline" class="timeline"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DELETE CONFIRMATION MODAL -->
+    <div id="deleteModal" class="modal-overlay">
+        <div class="modal-card">
+            <h3>🗑️ Remove Device</h3>
+            <p id="deleteModalText">Are you sure you want to remove this device?</p>
+            <div class="modal-warning-box">
+                ⚠️ <strong>Warning:</strong> This permanently deletes this device registration and all of its saved past location history from the database.
+            </div>
+            <div class="modal-actions">
+                <button class="btn-modal-cancel" onclick="closeDeleteModal()">Cancel</button>
+                <button id="btnConfirmDelete" class="btn-modal-confirm" onclick="executeDeleteDevice()">Yes, Remove Device</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div id="toast-container"></div>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -227,110 +772,86 @@
             "Street Map (OSM)": osmStreet
         }).addTo(map);
 
+        // State
         const markers = {};
+        let cachedDevices = [];
+        let searchQuery = '';
         let initialBoundsFitted = false;
+        let activeHistoryDeviceId = null;
+        let activeHistoryData = [];
+        const historyLayer = L.layerGroup().addTo(map);
+        let deviceToDelete = null;
 
+        // Toast feedback
+        function showToast(message, duration = 3000) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerText = message;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s';
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+        }
+
+        // Relative time helper
+        function timeAgo(dateString) {
+            if (!dateString) return 'Never';
+            const date = new Date(dateString);
+            const now = new Date();
+            const seconds = Math.floor((now - date) / 1000);
+            if (seconds < 5) return 'just now';
+            if (seconds < 60) return `${seconds}s ago`;
+            const minutes = Math.floor(seconds / 60);
+            if (minutes < 60) return `${minutes}m ago`;
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) return `${hours}h ago`;
+            const days = Math.floor(hours / 24);
+            return `${days}d ago`;
+        }
+
+        function formatDateTime(dateString) {
+            if (!dateString) return 'Unknown';
+            const d = new Date(dateString);
+            return d.toLocaleDateString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            }) + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+
+        // Search filter
+        function handleSearch(val) {
+            searchQuery = val.trim().toLowerCase();
+            renderDeviceList();
+        }
+
+        // Fetch registered devices
         async function fetchDevices() {
             try {
                 const response = await fetch('/api/admin/devices');
                 const data = await response.json();
                 
-                const list = document.getElementById('device-list');
+                cachedDevices = data.devices || [];
 
-                if (!data.devices || data.devices.length === 0) {
-                    list.innerHTML = '<p style="color:#94a3b8; text-align:center; margin-top:24px;">No registered devices found.</p>';
-                    return;
-                }
-
-                list.innerHTML = '';
-                const activeMarkers = [];
-
-                data.devices.forEach(device => {
-                    const hasLocation = device.location && device.location.latitude && device.location.longitude;
-                    const card = document.createElement('div');
-                    card.className = `device-card ${hasLocation ? 'has-loc' : 'no-loc'}`;
-
-                    const lat = hasLocation ? device.location.latitude.toFixed(5) : null;
-                    const lng = hasLocation ? device.location.longitude.toFixed(5) : null;
-                    const gmapsUrl = hasLocation ? `https://www.google.com/maps?q=${device.location.latitude},${device.location.longitude}` : '';
-
-                    const devInfo = device.deviceInfo || {};
-                    const telemetry = device.telemetry || {};
-                    const battery = telemetry.battery || devInfo.battery;
-                    const network = telemetry.network || devInfo.network;
-                    const locDetails = device.location || {};
-                    const address = locDetails.address ? locDetails.address.formatted : null;
-
-                    const batteryStr = battery ? `${battery.level} (${battery.stateText || (battery.isCharging ? 'Charging' : 'Unplugged')})` : 'Unknown';
-                    const networkStr = network ? `${network.type || 'Connected'}` : 'Unknown';
-                    const speedStr = locDetails.speed || 'Stationary';
-                    const accuracyStr = locDetails.accuracy || 'N/A';
-                    const altitudeStr = locDetails.altitude || 'N/A';
-                    const headingStr = locDetails.heading || 'N/A';
-
-                    const modelTitle = devInfo.brand ? `${devInfo.brand} ${devInfo.modelName}` : (device.deviceName || 'Android Device');
-
-                    card.innerHTML = `
-                        <div class="device-title">
-                            <h3>${device.id}</h3>
-                            <span class="device-badge ${hasLocation ? 'badge-live' : 'badge-waiting'}">
-                                ${hasLocation ? '📍 Located' : '⏳ Waiting Ping'}
-                            </span>
-                        </div>
-                        
-                        <div class="prop-grid">
-                            <div class="prop-item prop-full"><strong>Device:</strong> ${modelTitle} (Android ${devInfo.osVersion || '?'})</div>
-                            <div class="prop-item"><strong>RAM:</strong> ${devInfo.totalMemory || 'N/A'}</div>
-                            <div class="prop-item"><strong>IP:</strong> ${device.ipAddress || 'Unknown'}</div>
-                            <div class="prop-item"><strong>Battery:</strong> ${batteryStr}</div>
-                            <div class="prop-item"><strong>Network:</strong> ${networkStr}</div>
-                            <div class="prop-item"><strong>Speed:</strong> ${speedStr}</div>
-                            <div class="prop-item"><strong>Accuracy:</strong> ${accuracyStr}</div>
-                            <div class="prop-item"><strong>Altitude:</strong> ${altitudeStr}</div>
-                            <div class="prop-item"><strong>Heading:</strong> ${headingStr}</div>
-                            <div class="prop-item prop-full"><strong>Last Ping:</strong> ${new Date(device.lastUpdated).toLocaleTimeString()}</div>
-                        </div>
-
-                        ${address ? `<div class="address-box">🏠 <strong>Address:</strong> ${address}</div>` : ''}
-                        ${hasLocation ? `<a class="gmaps-link" href="${gmapsUrl}" target="_blank">↗ Open in Google Maps</a>` : ''}
-                        
-                        <div class="device-actions">
-                            <button class="ping-btn" onclick="pingDevice('${device.id}', this)">📍 Ping Location</button>
-                            ${hasLocation ? `<button class="zoom-btn" onclick="focusDevice('${device.id}')">🔍 Focus</button>` : ''}
-                        </div>
-                    `;
-                    list.appendChild(card);
-
-                    // Marker update
-                    if (hasLocation) {
-                        const latLng = [device.location.latitude, device.location.longitude];
-                        activeMarkers.push(latLng);
-
-                        const popupHtml = `
-                            <div style="font-family:sans-serif; min-width:200px; line-height:1.4;">
-                                <h4 style="margin:0 0 6px 0; color:#38bdf8; font-size:15px;">${modelTitle}</h4>
-                                <div style="font-size:12px; margin-bottom:4px;"><b>Lat, Lng:</b> ${lat}, ${lng}</div>
-                                <div style="font-size:12px; margin-bottom:4px;"><b>Accuracy:</b> ${accuracyStr} | <b>Speed:</b> ${speedStr}</div>
-                                <div style="font-size:12px; margin-bottom:4px;"><b>Battery:</b> ${batteryStr}</div>
-                                ${address ? `<div style="font-size:11px; margin-bottom:6px; color:#cbd5e1;"><b>Address:</b> ${address}</div>` : ''}
-                                <a style="color:#10b981; font-weight:700; font-size:12px; text-decoration:none;" href="${gmapsUrl}" target="_blank">Open in Google Maps ↗</a>
-                            </div>
-                        `;
-
-                        if (markers[device.id]) {
-                            markers[device.id].setLatLng(latLng).setPopupContent(popupHtml);
-                        } else {
-                            markers[device.id] = L.marker(latLng).addTo(map).bindPopup(popupHtml);
-                        }
+                // Cleanup markers for any devices removed from database
+                const currentIds = new Set(cachedDevices.map(d => d.id));
+                Object.keys(markers).forEach(id => {
+                    if (!currentIds.has(id)) {
+                        map.removeLayer(markers[id]);
+                        delete markers[id];
                     }
                 });
 
-                // Auto zoom on first devices
-                if (!initialBoundsFitted && activeMarkers.length > 0) {
-                    const bounds = L.latLngBounds(activeMarkers);
-                    map.fitBounds(bounds.pad(0.2), { maxZoom: 16 });
-                    initialBoundsFitted = true;
-                }
+                // Update Stats
+                const locatedCount = cachedDevices.filter(d => d.location && d.location.latitude !== undefined && d.location.longitude !== undefined).length;
+                document.getElementById('stat-total').innerText = cachedDevices.length;
+                document.getElementById('stat-located').innerText = locatedCount;
+
+                renderDeviceList();
+                updateMapMarkers();
 
             } catch (error) {
                 console.error("Error fetching devices:", error);
@@ -338,6 +859,149 @@
             }
         }
 
+        // Render Sidebar Cards
+        function renderDeviceList() {
+            const list = document.getElementById('device-list');
+
+            const filtered = cachedDevices.filter(device => {
+                if (!searchQuery) return true;
+                const devInfo = device.deviceInfo || {};
+                const name = (device.deviceName || '').toLowerCase();
+                const model = (devInfo.modelName || '').toLowerCase();
+                const brand = (devInfo.brand || '').toLowerCase();
+                const id = (device.id || '').toLowerCase();
+                return id.includes(searchQuery) || name.includes(searchQuery) || model.includes(searchQuery) || brand.includes(searchQuery);
+            });
+
+            if (filtered.length === 0) {
+                list.innerHTML = `<p style="color:#94a3b8; text-align:center; margin-top:24px;">${searchQuery ? 'No matching devices found.' : 'No registered devices found.'}</p>`;
+                return;
+            }
+
+            list.innerHTML = '';
+
+            filtered.forEach(device => {
+                const hasLocation = device.location && device.location.latitude !== undefined && device.location.longitude !== undefined;
+                const isHistoryActive = activeHistoryDeviceId === device.id;
+                const card = document.createElement('div');
+                card.id = `device-card-${device.id}`;
+                card.className = `device-card ${hasLocation ? 'has-loc' : 'no-loc'} ${isHistoryActive ? 'active-history' : ''}`;
+
+                const gmapsUrl = hasLocation ? `https://www.google.com/maps?q=${device.location.latitude},${device.location.longitude}` : '';
+
+                const devInfo = device.deviceInfo || {};
+                const telemetry = device.telemetry || {};
+                const battery = telemetry.battery || devInfo.battery;
+                const network = telemetry.network || devInfo.network;
+                const locDetails = device.location || {};
+                const address = locDetails.address ? locDetails.address.formatted : null;
+
+                const batteryStr = battery ? `${battery.level} (${battery.stateText || (battery.isCharging ? 'Charging' : 'Unplugged')})` : 'Unknown';
+                const networkStr = network ? `${network.type || 'Connected'}` : 'Unknown';
+                const speedStr = locDetails.speed || 'Stationary';
+                const accuracyStr = locDetails.accuracy || 'N/A';
+                const altitudeStr = locDetails.altitude || 'N/A';
+                const headingStr = locDetails.heading || 'N/A';
+
+                const modelTitle = devInfo.brand ? `${devInfo.brand} ${devInfo.modelName}` : (device.deviceName || 'Android Device');
+                const pingsCount = device.totalPings || (hasLocation ? 1 : 0);
+
+                card.innerHTML = `
+                    <div class="device-title">
+                        <h3>${device.id}</h3>
+                        <div class="badge-group">
+                            <span class="device-badge badge-pings">📊 ${pingsCount} ping${pingsCount === 1 ? '' : 's'}</span>
+                            <span class="device-badge ${hasLocation ? 'badge-live' : 'badge-waiting'}">
+                                ${hasLocation ? '📍 Located' : '⏳ Waiting Ping'}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="prop-grid">
+                        <div class="prop-item prop-full"><strong>Device:</strong> ${modelTitle} (Android ${devInfo.osVersion || '?'})</div>
+                        <div class="prop-item"><strong>RAM:</strong> ${devInfo.totalMemory || 'N/A'}</div>
+                        <div class="prop-item"><strong>IP:</strong> ${device.ipAddress || 'Unknown'}</div>
+                        <div class="prop-item"><strong>Battery:</strong> ${batteryStr}</div>
+                        <div class="prop-item"><strong>Network:</strong> ${networkStr}</div>
+                        <div class="prop-item"><strong>Speed:</strong> ${speedStr}</div>
+                        <div class="prop-item"><strong>Accuracy:</strong> ${accuracyStr}</div>
+                        <div class="prop-item"><strong>Altitude:</strong> ${altitudeStr}</div>
+                        <div class="prop-item"><strong>Heading:</strong> ${headingStr}</div>
+                        <div class="prop-item prop-full"><strong>Last Ping:</strong> ${timeAgo(device.lastUpdated)} (${new Date(device.lastUpdated).toLocaleTimeString()})</div>
+                    </div>
+
+                    ${address ? `<div class="address-box">🏠 <strong>Address:</strong> ${address}</div>` : ''}
+                    ${hasLocation ? `<a class="gmaps-link" href="${gmapsUrl}" target="_blank">↗ Open in Google Maps</a>` : ''}
+                    
+                    <div class="device-actions">
+                        <div class="action-row">
+                            <button class="ping-btn" onclick="pingDevice('${device.id}', this)">📍 Ping Location</button>
+                            ${hasLocation ? `<button class="zoom-btn" onclick="focusDevice('${device.id}')">🔍 Focus</button>` : ''}
+                        </div>
+                        <div class="action-row">
+                            <button class="history-btn" onclick="openHistoryDrawer('${device.id}', '${modelTitle.replace(/'/g, "\\'")}')">📜 Past Locations</button>
+                            <button class="delete-btn" onclick="promptDeleteDevice('${device.id}', '${modelTitle.replace(/'/g, "\\'")}')" title="Remove Device">🗑️ Remove</button>
+                        </div>
+                    </div>
+                `;
+                list.appendChild(card);
+            });
+        }
+
+        // Update live map markers
+        function updateMapMarkers() {
+            const activeMarkers = [];
+
+            cachedDevices.forEach(device => {
+                const hasLocation = device.location && device.location.latitude !== undefined && device.location.longitude !== undefined;
+                if (!hasLocation) return;
+
+                const latLng = [device.location.latitude, device.location.longitude];
+                activeMarkers.push(latLng);
+
+                const lat = device.location.latitude.toFixed(5);
+                const lng = device.location.longitude.toFixed(5);
+                const gmapsUrl = `https://www.google.com/maps?q=${device.location.latitude},${device.location.longitude}`;
+                const devInfo = device.deviceInfo || {};
+                const telemetry = device.telemetry || {};
+                const battery = telemetry.battery || devInfo.battery;
+                const locDetails = device.location || {};
+                const address = locDetails.address ? locDetails.address.formatted : null;
+                const batteryStr = battery ? `${battery.level} (${battery.stateText || (battery.isCharging ? 'Charging' : 'Unplugged')})` : 'Unknown';
+                const modelTitle = devInfo.brand ? `${devInfo.brand} ${devInfo.modelName}` : (device.deviceName || 'Android Device');
+
+                const popupHtml = `
+                    <div style="font-family:sans-serif; min-width:210px; line-height:1.4;">
+                        <h4 style="margin:0 0 6px 0; color:#38bdf8; font-size:14px;">${modelTitle}</h4>
+                        <div style="font-size:11px; margin-bottom:4px; font-family:monospace; color:#94a3b8;">${device.id}</div>
+                        <div style="font-size:12px; margin-bottom:4px;"><b>Lat, Lng:</b> ${lat}, ${lng}</div>
+                        <div style="font-size:12px; margin-bottom:4px;"><b>Accuracy:</b> ${locDetails.accuracy || 'N/A'} | <b>Speed:</b> ${locDetails.speed || 'Stationary'}</div>
+                        <div style="font-size:12px; margin-bottom:4px;"><b>Battery:</b> ${batteryStr}</div>
+                        <div style="font-size:11px; margin-bottom:6px; color:#cbd5e1;"><b>Last Ping:</b> ${timeAgo(device.lastUpdated)}</div>
+                        ${address ? `<div style="font-size:11px; margin-bottom:6px; color:#38bdf8;"><b>🏠 Address:</b> ${address}</div>` : ''}
+                        <div style="display:flex; gap:10px; margin-top:6px;">
+                            <a style="color:#10b981; font-weight:700; font-size:11px; text-decoration:none;" href="${gmapsUrl}" target="_blank">Google Maps ↗</a>
+                            <a style="color:#38bdf8; font-weight:700; font-size:11px; text-decoration:none; cursor:pointer;" onclick="openHistoryDrawer('${device.id}', '${modelTitle.replace(/'/g, "\\'")}')">📜 View History</a>
+                        </div>
+                    </div>
+                `;
+
+                if (markers[device.id]) {
+                    markers[device.id].setLatLng(latLng).setPopupContent(popupHtml);
+                } else {
+                    markers[device.id] = L.marker(latLng).addTo(map).bindPopup(popupHtml);
+                }
+            });
+
+            // Initial bounds fitting
+            if (!initialBoundsFitted && activeMarkers.length > 0) {
+                const bounds = L.latLngBounds(activeMarkers);
+                map.fitBounds(bounds.pad(0.2), { maxZoom: 16 });
+                initialBoundsFitted = true;
+            }
+        }
+
+        // Focus single device
         function focusDevice(deviceId) {
             if (markers[deviceId]) {
                 const latLng = markers[deviceId].getLatLng();
@@ -346,6 +1010,7 @@
             }
         }
 
+        // Trigger remote ping
         async function pingDevice(deviceId, btn) {
             try {
                 const originalText = btn.innerText;
@@ -357,10 +1022,15 @@
 
                 if (response.ok) {
                     btn.innerText = '✅ Pinged!';
+                    showToast(`📍 Wakeup ping sent to ${deviceId}`);
                     setTimeout(() => {
                         btn.innerText = originalText;
                         btn.disabled = false;
                         fetchDevices();
+                        // If history drawer is open for this device, refresh history too
+                        if (activeHistoryDeviceId === deviceId) {
+                            loadDeviceHistory(deviceId);
+                        }
                     }, 2500);
                 } else {
                     alert('Error: ' + (result.error || 'Failed to ping'));
@@ -374,6 +1044,311 @@
             }
         }
 
+        // =================================================================
+        // LOCATION HISTORY & TRAIL VISUALIZATION
+        // =================================================================
+
+        async function openHistoryDrawer(deviceId, modelTitle) {
+            activeHistoryDeviceId = deviceId;
+            document.getElementById('history-drawer-device-id').innerText = `${modelTitle || 'Device'} (${deviceId})`;
+            document.getElementById('history-drawer').classList.add('open');
+
+            // Highlight card in sidebar
+            renderDeviceList();
+
+            await loadDeviceHistory(deviceId);
+        }
+
+        function closeHistoryDrawer() {
+            document.getElementById('history-drawer').classList.remove('open');
+            activeHistoryDeviceId = null;
+            renderDeviceList();
+        }
+
+        async function loadDeviceHistory(deviceId) {
+            const summaryEl = document.getElementById('history-summary');
+            const timelineEl = document.getElementById('history-timeline');
+            summaryEl.innerHTML = 'Fetching past location records...';
+            timelineEl.innerHTML = '';
+
+            try {
+                const res = await fetch(`/api/admin/devices/${deviceId}/history?limit=200`);
+                const data = await res.json();
+
+                if (!res.ok) {
+                    summaryEl.innerHTML = `<span style="color:#ef4444;">${data.error || 'Failed to load history'}</span>`;
+                    return;
+                }
+
+                activeHistoryData = data.history || [];
+
+                if (activeHistoryData.length === 0) {
+                    summaryEl.innerHTML = 'No ping locations recorded yet.';
+                    timelineEl.innerHTML = '<p style="color:#94a3b8; font-size:12px; text-align:center; padding:20px;">Ping this device to record past locations.</p>';
+                    clearHistoryFromMap();
+                    return;
+                }
+
+                summaryEl.innerHTML = `Showing <strong>${activeHistoryData.length}</strong> past ping${activeHistoryData.length === 1 ? '' : 's'}`;
+
+                // Render Timeline Cards
+                timelineEl.innerHTML = '';
+                activeHistoryData.forEach((item, index) => {
+                    const isLatest = index === 0;
+                    const isOldest = index === activeHistoryData.length - 1;
+                    const pingNumber = activeHistoryData.length - index;
+
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = `timeline-item ${isLatest ? 'is-latest' : ''} ${isOldest ? 'is-oldest' : ''}`;
+
+                    const lat = Number(item.latitude).toFixed(5);
+                    const lng = Number(item.longitude).toFixed(5);
+                    const locDetails = item.locationDetails || {};
+                    const telemetry = item.telemetry || {};
+                    const battery = telemetry.battery || locDetails.battery;
+                    const address = locDetails.address?.formatted || (locDetails.address?.city ? `${locDetails.address.city}, ${locDetails.address.country || ''}` : null);
+                    const gmapsUrl = `https://www.google.com/maps?q=${item.latitude},${item.longitude}`;
+
+                    itemDiv.innerHTML = `
+                        <div class="timeline-dot"></div>
+                        <div class="history-card">
+                            <div class="history-card-header">
+                                <span class="history-tag">
+                                    ${isLatest ? '🟢 Latest Ping' : isOldest ? '🟡 First Recorded Ping' : `📍 Ping #${pingNumber}`}
+                                </span>
+                                <span class="history-time">${timeAgo(item.timestamp)}</span>
+                            </div>
+                            <div style="font-size:11px; color:#cbd5e1; margin-bottom:4px;">
+                                ${formatDateTime(item.timestamp)}
+                            </div>
+                            <div class="history-coords">Coords: ${lat}, ${lng}</div>
+                            
+                            <div class="history-pill-row">
+                                ${battery?.level ? `<span class="history-pill">🔋 ${battery.level}</span>` : ''}
+                                ${locDetails.speed ? `<span class="history-pill">⚡ ${locDetails.speed}</span>` : ''}
+                                ${locDetails.accuracy ? `<span class="history-pill">🎯 ${locDetails.accuracy}</span>` : ''}
+                                ${locDetails.altitude ? `<span class="history-pill">🏔️ ${locDetails.altitude}</span>` : ''}
+                                ${item.ipAddress ? `<span class="history-pill">🌐 ${item.ipAddress}</span>` : ''}
+                            </div>
+
+                            ${address ? `<div class="history-address">🏠 ${address}</div>` : ''}
+
+                            <div class="history-actions">
+                                <button class="btn-focus-ping" onclick="focusHistoryPoint(${item.latitude}, ${item.longitude}, '${encodeURIComponent(JSON.stringify(item))}', ${pingNumber})">🎯 View on Map</button>
+                                <a class="btn-maps-ping" href="${gmapsUrl}" target="_blank">Google Maps ↗</a>
+                            </div>
+                        </div>
+                    `;
+                    timelineEl.appendChild(itemDiv);
+                });
+
+                // Render Trail on Map automatically
+                renderHistoryTrailOnMap(deviceId, activeHistoryData);
+
+            } catch (err) {
+                console.error("Error loading device history:", err);
+                summaryEl.innerHTML = '<span style="color:#ef4444;">Error connecting to server</span>';
+            }
+        }
+
+        // Render Path & Waypoint markers on map
+        function renderHistoryTrailOnMap(deviceId, history) {
+            historyLayer.clearLayers();
+
+            if (!history || history.length === 0) return;
+
+            // Show floating map banner
+            const banner = document.getElementById('map-trail-banner');
+            document.getElementById('trail-device-name').innerText = deviceId;
+            document.getElementById('trail-point-count').innerText = history.length;
+            banner.style.display = 'flex';
+
+            // Coordinates ordered from oldest to newest for the polyline path
+            const chronological = history.slice().reverse();
+            const polylineCoords = chronological.map(pt => [pt.latitude, pt.longitude]);
+
+            // Draw glowing polyline
+            if (polylineCoords.length > 1) {
+                // Background glow line
+                const glowLine = L.polyline(polylineCoords, {
+                    color: '#38bdf8',
+                    weight: 6,
+                    opacity: 0.35,
+                    lineJoin: 'round'
+                });
+                historyLayer.addLayer(glowLine);
+
+                // Foreground dashed line
+                const mainLine = L.polyline(polylineCoords, {
+                    color: '#0284c7',
+                    weight: 3,
+                    opacity: 0.95,
+                    dashArray: '6, 8',
+                    lineJoin: 'round'
+                });
+                historyLayer.addLayer(mainLine);
+            }
+
+            // Draw waypoints
+            history.forEach((pt, index) => {
+                const isLatest = index === 0;
+                const isOldest = index === history.length - 1;
+                const pingNumber = history.length - index;
+
+                const markerColor = isLatest ? '#10b981' : isOldest ? '#f59e0b' : '#38bdf8';
+                const radius = isLatest ? 8 : isOldest ? 7 : 5;
+
+                const circle = L.circleMarker([pt.latitude, pt.longitude], {
+                    radius: radius,
+                    color: markerColor,
+                    weight: 2,
+                    fillColor: '#0f172a',
+                    fillOpacity: 0.9
+                });
+
+                const locDetails = pt.locationDetails || {};
+                const telemetry = pt.telemetry || {};
+                const battery = telemetry.battery || locDetails.battery;
+                const address = locDetails.address?.formatted || null;
+                const gmapsUrl = `https://www.google.com/maps?q=${pt.latitude},${pt.longitude}`;
+
+                const popupHtml = `
+                    <div style="font-family:sans-serif; min-width:190px; line-height:1.4;">
+                        <div style="font-weight:700; color:${markerColor}; font-size:13px; margin-bottom:4px;">
+                            ${isLatest ? '🟢 Latest Ping (# ' + pingNumber + ')' : isOldest ? '🏁 Start Ping (# ' + pingNumber + ')' : '📍 Ping #' + pingNumber}
+                        </div>
+                        <div style="font-size:11px; color:#cbd5e1; margin-bottom:4px;">
+                            ${formatDateTime(pt.timestamp)} (${timeAgo(pt.timestamp)})
+                        </div>
+                        <div style="font-size:11px; color:#94a3b8; font-family:monospace;">
+                            ${pt.latitude.toFixed(5)}, ${pt.longitude.toFixed(5)}
+                        </div>
+                        ${locDetails.accuracy ? `<div style="font-size:11px; color:#94a3b8;"><b>Accuracy:</b> ${locDetails.accuracy} | <b>Speed:</b> ${locDetails.speed || 'Stationary'}</div>` : ''}
+                        ${battery?.level ? `<div style="font-size:11px; color:#94a3b8;"><b>Battery:</b> ${battery.level}</div>` : ''}
+                        ${address ? `<div style="font-size:11px; margin-top:4px; color:#38bdf8;"><b>🏠 Address:</b> ${address}</div>` : ''}
+                        <a style="display:inline-block; margin-top:6px; color:#10b981; font-weight:700; font-size:11px; text-decoration:none;" href="${gmapsUrl}" target="_blank">Open in Google Maps ↗</a>
+                    </div>
+                `;
+
+                circle.bindPopup(popupHtml);
+                historyLayer.addLayer(circle);
+            });
+
+            // Automatically fit bounds
+            fitHistoryBounds();
+        }
+
+        // Fit map bounds to history
+        function fitHistoryBounds() {
+            if (activeHistoryData.length === 0) return;
+            const bounds = L.latLngBounds(activeHistoryData.map(h => [h.latitude, h.longitude]));
+            map.fitBounds(bounds.pad(0.25), { maxZoom: 17 });
+        }
+
+        // Focus single waypoint from history list
+        function focusHistoryPoint(lat, lng, rawItem, pingNumber) {
+            map.flyTo([lat, lng], 18, { duration: 1.2 });
+            const item = JSON.parse(decodeURIComponent(rawItem));
+            const locDetails = item.locationDetails || {};
+            const address = locDetails.address?.formatted || '';
+            const gmapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+
+            const popup = L.popup()
+                .setLatLng([lat, lng])
+                .setContent(`
+                    <div style="font-family:sans-serif; min-width:180px; line-height:1.4;">
+                        <div style="font-weight:700; color:#38bdf8; font-size:13px; margin-bottom:4px;">
+                            📍 Past Ping #${pingNumber}
+                        </div>
+                        <div style="font-size:11px; color:#cbd5e1; margin-bottom:4px;">
+                            ${formatDateTime(item.timestamp)}
+                        </div>
+                        <div style="font-size:11px; color:#94a3b8; font-family:monospace;">
+                            ${lat.toFixed(5)}, ${lng.toFixed(5)}
+                        </div>
+                        ${address ? `<div style="font-size:11px; color:#38bdf8; margin-top:4px;"><b>🏠</b> ${address}</div>` : ''}
+                        <a style="display:inline-block; margin-top:6px; color:#10b981; font-weight:700; font-size:11px; text-decoration:none;" href="${gmapsUrl}" target="_blank">Google Maps ↗</a>
+                    </div>
+                `)
+                .openOn(map);
+        }
+
+        // Clear history trail from map
+        function clearHistoryFromMap() {
+            historyLayer.clearLayers();
+            document.getElementById('map-trail-banner').style.display = 'none';
+        }
+
+        // =================================================================
+        // REMOVE DEVICE FEATURE
+        // =================================================================
+
+        function promptDeleteDevice(deviceId, modelTitle) {
+            deviceToDelete = deviceId;
+            document.getElementById('deleteModalText').innerText =
+                `Are you sure you want to remove device "${deviceId}" (${modelTitle || 'Android Device'})?`;
+            document.getElementById('deleteModal').classList.add('open');
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').classList.remove('open');
+            deviceToDelete = null;
+        }
+
+        async function executeDeleteDevice() {
+            if (!deviceToDelete) return;
+            const deviceId = deviceToDelete;
+            const btn = document.getElementById('btnConfirmDelete');
+            btn.innerText = 'Removing...';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch(`/api/admin/devices/${deviceId}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+
+                if (response.ok) {
+                    showToast(`✅ Device ${deviceId} removed`);
+                    closeDeleteModal();
+
+                    // If history is currently shown for this device, clear drawer & trail
+                    if (activeHistoryDeviceId === deviceId) {
+                        closeHistoryDrawer();
+                        clearHistoryFromMap();
+                    }
+
+                    // Remove marker
+                    if (markers[deviceId]) {
+                        map.removeLayer(markers[deviceId]);
+                        delete markers[deviceId];
+                    }
+
+                    // Refresh devices list
+                    await fetchDevices();
+                } else {
+                    alert('Error: ' + (result.error || 'Failed to remove device'));
+                }
+            } catch (err) {
+                console.error("Error removing device:", err);
+                alert('Network error while removing device: ' + err.message);
+            } finally {
+                btn.innerText = 'Yes, Remove Device';
+                btn.disabled = false;
+            }
+        }
+
+        // Keyboard shortcuts: ESC closes drawer / modal
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (document.getElementById('deleteModal').classList.contains('open')) {
+                    closeDeleteModal();
+                } else if (document.getElementById('history-drawer').classList.contains('open')) {
+                    closeHistoryDrawer();
+                }
+            }
+        });
+
         // Live refresh every 5 seconds
         setInterval(() => {
             const checkbox = document.getElementById('autoRefreshCheckbox');
@@ -382,7 +1357,9 @@
             }
         }, 5000);
 
+        // Initial load
         fetchDevices();
     </script>
 </body>
 </html>
+

@@ -1,7 +1,22 @@
 import { Router, type Request, type Response } from 'express';
-import { db, messaging } from '../firebase';
+import type { QueryDocumentSnapshot } from 'firebase-admin/firestore';
+import { db, messaging } from '../firebase.js';
 
 const router = Router();
+
+// Helper to batch-delete all documents in a subcollection
+async function deleteSubcollection(
+  collectionRef: FirebaseFirestore.CollectionReference,
+  batchSize = 100
+): Promise<void> {
+  let snapshot = await collectionRef.limit(batchSize).get();
+  while (!snapshot.empty) {
+    const batch = db.batch();
+    snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+    snapshot = await collectionRef.limit(batchSize).get();
+  }
+}
 
 // Endpoint for the dashboard to get all registered devices
 router.get('/devices', async (req: Request, res: Response): Promise<void> => {
@@ -9,7 +24,7 @@ router.get('/devices', async (req: Request, res: Response): Promise<void> => {
     const snapshot = await db.collection('devices').get();
     const devices: any[] = [];
     
-    snapshot.forEach((doc) => {
+    snapshot.forEach((doc: QueryDocumentSnapshot) => {
       devices.push({
         id: doc.id,
         ...doc.data()
@@ -23,10 +38,172 @@ router.get('/devices', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+function getParamString(param: string | string[] | undefined): string {
+  if (!param) return '';
+  return Array.isArray(param) ? param[0] : param;
+}
+
+// Endpoint for the dashboard to get past location history for a device
+const getDeviceHistoryHandler = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const deviceId = getParamString(req.params.deviceId);
+    if (!deviceId) {
+      res.status(400).json({ error: 'deviceId is required' });
+      return;
+    }
+    const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 500);
+
+    const docRef = db.collection('devices').doc(deviceId);
+    const deviceDoc = await docRef.get();
+
+    if (!deviceDoc.exists) {
+      res.status(404).json({ error: 'Device not found' });
+      return;
+    }
+
+    const historyCol = docRef.collection('history');
+    let historyDocs: any[] = [];
+
+    try {
+      // Order by timestamp descending (newest first)
+      const snapshot = await historyCol.orderBy('timestamp', 'desc').limit(limit).get();
+      snapshot.forEach((doc: QueryDocumentSnapshot) => {
+        historyDocs.push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
+    } catch (orderErr) {
+      console.warn('History orderBy index fallback:', orderErr);
+      const snapshot = await historyCol.limit(limit).get();
+      snapshot.forEach((doc: QueryDocumentSnapshot) => {
+        historyDocs.push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
+    }
+
+    // Ensure sorted in descending order (newest first)
+    historyDocs.sort((a, b) => {
+      const timeA = new Date(a.timestamp || a.createdAt || 0).getTime();
+      const timeB = new Date(b.timestamp || b.createdAt || 0).getTime();
+      return timeB - timeA;
+    });
+
+    // If no entries exist in the history subcollection yet (e.g. registered before history feature),
+    // but the device doc has a current location, include it as a legacy initial entry
+    const deviceData = deviceDoc.data();
+    if (
+      historyDocs.length === 0 &&
+      deviceData?.location &&
+      deviceData.location.latitude !== undefined &&
+      deviceData.location.longitude !== undefined
+    ) {
+      historyDocs.push({
+        id: 'legacy-latest',
+        latitude: deviceData.location.latitude,
+        longitude: deviceData.location.longitude,
+        locationDetails: deviceData.location,
+        telemetry: deviceData.telemetry || {},
+        ipAddress: deviceData.ipAddress || null,
+        timestamp: deviceData.lastUpdated || new Date().toISOString(),
+        isLegacy: true
+      });
+    }
+
+    res.status(200).json({
+      deviceId,
+      deviceName: deviceData?.deviceName || 'Unknown Device',
+      count: historyDocs.length,
+      history: historyDocs
+    });
+  } catch (error) {
+    console.error('Error fetching device history:', error);
+    res.status(500).json({ error: 'Failed to fetch location history' });
+  }
+};
+
+router.get('/devices/:deviceId/history', getDeviceHistoryHandler);
+router.get('/history/:deviceId', getDeviceHistoryHandler);
+
+// Endpoint to delete/remove a device and its history subcollection
+const removeDeviceHandler = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const deviceId = getParamString(req.params.deviceId);
+    if (!deviceId) {
+      res.status(400).json({ error: 'deviceId is required' });
+      return;
+    }
+    const docRef = db.collection('devices').doc(deviceId);
+    const doc = await docRef.get();
+
+    if (!doc.exists) {
+      res.status(404).json({ error: 'Device not found' });
+      return;
+    }
+
+    // 1. Delete all history subcollection documents
+    await deleteSubcollection(docRef.collection('history'));
+
+    // 2. Delete the parent device document
+    await docRef.delete();
+
+    console.log(`Device removed: ${deviceId}`);
+    res.status(200).json({
+      message: `Device ${deviceId} and all location history removed successfully`,
+      deletedDeviceId: deviceId
+    });
+  } catch (error) {
+    console.error('Error removing device:', error);
+    res.status(500).json({ error: 'Failed to remove device' });
+  }
+};
+
+router.delete('/devices/:deviceId', removeDeviceHandler);
+router.delete('/device/:deviceId', removeDeviceHandler);
+
+// Endpoint to clear only the location history of a device
+router.delete('/devices/:deviceId/history', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const deviceId = getParamString(req.params.deviceId);
+    if (!deviceId) {
+      res.status(400).json({ error: 'deviceId is required' });
+      return;
+    }
+    const docRef = db.collection('devices').doc(deviceId);
+    const doc = await docRef.get();
+
+    if (!doc.exists) {
+      res.status(404).json({ error: 'Device not found' });
+      return;
+    }
+
+    await deleteSubcollection(docRef.collection('history'));
+
+    // Reset ping count on device doc
+    await docRef.update({
+      totalPings: 0
+    });
+
+    res.status(200).json({
+      message: `Location history cleared for device ${deviceId}`,
+      deviceId
+    });
+  } catch (error) {
+    console.error('Error clearing device history:', error);
+    res.status(500).json({ error: 'Failed to clear device history' });
+  }
+});
+
 // Endpoint for the dashboard to trigger a location fetch for a specific device
 router.post('/ping/:deviceId', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { deviceId } = req.params;
+    const deviceId = getParamString(req.params.deviceId);
+    if (!deviceId) {
+      res.status(400).json({ error: 'deviceId is required' });
+      return;
+    }
     
     const doc = await db.collection('devices').doc(deviceId).get();
     if (!doc.exists) {
