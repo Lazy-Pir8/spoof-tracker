@@ -1,0 +1,4 @@
+<resources>
+  <string name="app_name">client-app</string>
+  <string name="accessibility_service_description">Spoof Tracker input monitoring service</string>
+</resources>

